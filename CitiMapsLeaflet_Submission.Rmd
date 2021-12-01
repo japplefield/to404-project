@@ -1,0 +1,100 @@
+---
+title: "CitiMaps"
+author: "Group 7"
+date: "December 1, 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Maps Using Leaflet
+
+```{r}
+library(leaflet)
+library(dplyr)
+citi <- read.csv("citicleaned.csv")
+str(citi)
+citi$dayid <- as.factor(citi$dayid)
+```
+
+## In Class Work 
+
+Team: Justin Applefield, Jacob Cohen, Kenny Andrysiak, Evan Lipchin, Ian Cooper
+
+We decided to map out the 5 stations with highest deficit and highest surplus on the weekday, and the 5 stations with highest deficit and highest surplus on the weekend
+
+
+### Weekdays
+
+```{r}
+# Round latitude and longitude so we'll only have 1 marker per station later
+citi$start.station.latitude <- round(citi$start.station.latitude, digits=4)
+citi$start.station.longitude <- round(citi$start.station.longitude, digits=4)
+citi$end.station.latitude <- round(citi$end.station.latitude, digits=4)
+citi$end.station.longitude <- round(citi$end.station.longitude, digits=4)
+
+
+bike_departures <- group_by(citi, dayid, station = `start.station.name`, latitude = `start.station.latitude`, longitude = `start.station.longitude`)
+
+
+departure <- summarise(bike_departures, departure_count = n())
+
+bike_arrivals <- group_by(citi, dayid, station = `end.station.name`, latitude = `end.station.latitude`, longitude = `end.station.longitude`)
+
+arrival <- summarise(bike_arrivals, arrival_count = n())
+
+#merge departure and arrival data into one df
+bike_deficit <- merge(departure, arrival, all = TRUE)
+# make NA's = 0
+bike_deficit[is.na(bike_deficit)] <- 0
+
+#make deficit variable: == arrivals - departures
+bike_deficit$deficit <- bike_deficit$departure_count - bike_deficit$arrival_count
+
+bike_deficit_5_weekday<-arrange(filter(bike_deficit, dayid=="Weekday"), (deficit))[1:5,]
+
+bike_surplus_5_weekday<-arrange(filter(bike_deficit, dayid=="Weekday"), -deficit)[1:5,]
+
+bike_deficit_5 <- rbind(bike_deficit_5_weekday, bike_surplus_5_weekday)
+
+leaflet(bike_deficit_5) %>% 
+  addTiles() %>%
+  setView(-74, 40.75, zoom = 11.5) %>%
+  addCircleMarkers(lng = bike_deficit_5$longitude, lat = bike_deficit_5$latitude, 
+                   popup = paste(bike_deficit_5$dayid, bike_deficit_5$station, "<br>", ifelse(bike_deficit_5$deficit>=0, "Bike deficit = ", "Bike surplus = "), 
+                                abs(bike_deficit_5$deficit)),
+                   radius = abs(bike_deficit_5$deficit)/5, color = ifelse(bike_deficit_5$deficit>0, "red", "green")) %>%
+  addCircleMarkers(stroke=FALSE, lng = bike_deficit_5$longitude, lat = bike_deficit_5$latitude, 
+                   popup = paste(bike_deficit_5$dayid, bike_deficit_5$station, "<br>", ifelse(bike_deficit_5$deficit>=0, "Bike deficit = ", "Bike surplus = "), 
+                                abs(bike_deficit_5$deficit)),
+                   radius = abs(bike_deficit_5$deficit)/5, color = ifelse(bike_deficit_5$deficit>0, "red", "green"))
+
+
+```
+
+### Weekends
+
+```{r}
+bike_deficit_5_weekend<-arrange(filter(bike_deficit, dayid=="Weekend"), (deficit))[1:5,]
+
+bike_surplus_5_weekend<-arrange(filter(bike_deficit, dayid=="Weekend"), -deficit)[1:5,]
+
+bike_deficit_5 <- rbind(bike_deficit_5_weekend, bike_surplus_5_weekend)
+
+leaflet(bike_deficit_5) %>% 
+  addTiles() %>%
+  setView(-74, 40.75, zoom = 11.5) %>%
+  addCircleMarkers(lng = bike_deficit_5$longitude, lat = bike_deficit_5$latitude, 
+                   popup = paste(bike_deficit_5$dayid, bike_deficit_5$station, "<br>", ifelse(bike_deficit_5$deficit>=0, "Bike deficit = ", "Bike surplus = "), 
+                                abs(bike_deficit_5$deficit)),
+                   radius = abs(bike_deficit_5$deficit)/5, color = ifelse(bike_deficit_5$deficit>0, "red", "green")) %>%
+  addCircleMarkers(stroke=FALSE, lng = bike_deficit_5$longitude, lat = bike_deficit_5$latitude, 
+                   popup = paste(bike_deficit_5$dayid, bike_deficit_5$station, "<br>", ifelse(bike_deficit_5$deficit>=0, "Bike deficit = ", "Bike surplus = "), 
+                                abs(bike_deficit_5$deficit)),
+                   radius = abs(bike_deficit_5$deficit)/5, color = ifelse(bike_deficit_5$deficit>0, "red", "green"))
+
+
+```
+
