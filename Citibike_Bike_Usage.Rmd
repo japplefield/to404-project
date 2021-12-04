@@ -1,0 +1,115 @@
+---
+title: "Citibike Bike Usage"
+author: "Justin Applefield"
+date: "12/03/2021"
+output: 
+  html_document:
+    code_folding: hide  
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+```{r, cache=FALSE}
+# Loading the Libraries
+library(tidyverse)
+library(ggplot2)
+library(gganimate)
+library(leaflet)
+```
+
+#Citibike Team # Group Project  
+```{r}
+# Observing the Data
+citi <- read_csv("citicleaned.csv")
+
+library(janitor)
+citi <- clean_names(citi)
+
+citi$start_station_name <- as.factor(citi$start_station_name)
+citi$start_station_id <- as.factor(citi$start_station_id)
+citi$end_station_name <- as.factor(citi$end_station_name)
+citi$end_station_id <- as.factor(citi$end_station_id)
+citi$usertype <- as.factor(citi$usertype)
+citi$gender <- as.factor(citi$gender)
+citi$dayid <- as.factor(citi$dayid)
+
+str(citi)
+```
+
+## Bike Usage Analysis 
+
+I'm seeking to answer the following questions:
+
+### How does bike usage change over time?
+
+#### Number of Rides per Day per bike
+```{r}
+daily_usage <- citi %>%
+  group_by(dayid, day, bikeid) %>%
+  summarize(num_rides = n())
+```
+
+#### Number of Rides per Bike
+```{r}
+bike_usage <- citi %>%
+  group_by(bikeid) %>%
+  summarize(num_rides = n())
+```
+
+#### Average number of 
+
+### How does bike usage change month to month?
+
+#### Number of Rides per Month
+```{r}
+monthly_usage <- citi %>%
+  group_by(month) %>%
+  summarize(num_rides = n())
+```
+
+### How does bike usage change between weekdays and weekends?
+```{r}
+weekday_vs_weekend <- daily_usage %>%
+  group_by(dayid) %>%
+  summarize(avg_rides = mean(num_rides))
+
+weekday_vs_weekend_by_month <- citi %>%
+  group_by(month, dayid) %>%
+  summarize(avg_rides = mean(n()))
+
+weekday_vs_weekend_by_month %>% ggplot(aes(x = month, y = avg_rides, color = dayid)) +
+  geom_line()
+```
+
+### How does bike usage change season to season?
+```{r}
+
+```
+
+### What bikes are used the most?
+```{r}
+
+```
+
+### Do certain bikes make it back to the same stations?
+```{r}
+
+```
+
+### How many trips do certain bikes take per day?
+```{r}
+
+```
+
+### Where do bikes travel (on a map)?
+```{r}
+
+```
+
+
