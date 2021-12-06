@@ -1,0 +1,120 @@
+---
+title: "Citibike Ride Patterns"
+author: "Evan Lipchin"
+date: "11/29/2021"
+output: 
+  html_document:
+    code_folding: hide  
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE) 
+knitr::opts_chunk$set(cache= TRUE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+```{r, cache=FALSE}
+#Loading the Libraries 
+library(ggplot2)
+library(dplyr)
+library(gganimate)
+library(tidyr)
+library(stringr)
+library(geosphere)
+library(leaflet)
+```
+
+#Citibike Team #5 Group Project  
+```{r}
+#Observing the Data 
+citi <- read.csv("citicleaned.csv")
+str(citi)
+```
+
+## Ride Pattern Analysis 
+
+### What are the Most Popular Stations? 
+```{r}
+#Departing Station Dataset (Only shows top 10 locations)
+Departing_Stations <- group_by(citi, start.station.name, start.station.latitude, start.station.longitude)
+Departing_Stations <- arrange(summarize(Departing_Stations, Trips = n()), desc(Trips))[1:10,]
+
+#Arriving Station Dataset (only shows top 10 locations)
+Arriving_Stations <- group_by(citi, end.station.name, end.station.latitude, end.station.longitude)
+Arriving_Stations <- arrange(summarize(Arriving_Stations, Trips = n()), desc(Trips))[1:10,]
+
+#Creating Map Based Visualizations (Won't let me add color argument for some reason)
+Stations_Map <- leaflet() %>%
+  addTiles() %>% 
+  addMarkers(lat = Departing_Stations$start.station.latitude, lng = Departing_Stations$start.station.longitude, popup = paste(Departing_Stations$start.station.name, "<br>", Departing_Stations$Trips), clusterOptions = markerClusterOptions()) %>% 
+  addCircleMarkers(lat = Arriving_Stations$end.station.latitude, lng = Arriving_Stations$end.station.longitude, popup = paste(Arriving_Stations$end.station.name, "<br>",Arriving_Stations$Trips), clusterOptions = markerClusterOptions())
+
+Stations_Map 
+```
+
+The most popular stations for both departing (represented by markers) and arriving (represented by circles) are scattered throughout New York City. One particularly interesting finding is that many of the most popular stations to leave from are also the most popular stations to arrive to, which helps regulate the flow of bikes around New York city 
+
+### What are the Most Popular Routes? 
+```{r}
+#Creating the dataset
+citi$routes <- paste(citi$start.station.name, citi$end.station.name, sep = " -> ")
+
+#Finding the Most Popular Routes (only shows top 10!) 
+Routes <- group_by(citi, routes)
+Routes <- arrange(summarize(Routes, Trips = n(), PercentofTotal = round(n()/205518 * 100, digits=3)), desc(Trips))[1:10,]
+Routes 
+  
+```
+
+Of the 205k trips sampled, there were 83k unique routes, suggesting that no one route is extremely popular amongst New Yorkers and that evaluating individual routes over time would not be statistically significant. In fact, the top 10 most popular routes combined represent less than 0.3% of total trips. Funny enough, 2 of the 10 most popular routes (#2 and #9) involve both picking up and dropping off your bike at the exact same location! 
+
+### Does Age Affect the Speed of Riders? 
+
+```{r}
+#Converting Meters per Second to Miles per Hour 
+citi$speed_MPH <- citi$speed * 3600 / 1000 * 0.6
+
+#Creating New Age Column 
+citi$age <- 2021 - citi$birth.year
+
+#Sorting by Age and Graphing 
+Age_Speed <- citi %>% 
+  group_by(age) %>%
+  summarize(Avg_Speed = mean(speed_MPH, na.rm = TRUE))
+
+baseplot <- ggplot(data = Age_Speed, aes(x = age, y = Avg_Speed)) +labs(x = "Age (Years)", y = "Average Speed (MPH)") + xlim(18,80) + ylim(3,5)
+realplot <- baseplot +geom_point(color="blue")
+realplot
+```
+
+A person's age appears to have a significant impact on the speed at which they ride. From ages 18 to 30, there is a sharp increase in average speed, going from 3 to 4.5 miles per hour. However, the average speed of riders starts to gradually decline around age 35, with that rate of decline increasing with age, especially in senior citizens (65-80 year old individuals). Oddly enough, individuals in their late 70s appear to ride at nearly the same speed as people in their early 20s!  
+
+### Do Trip Durations Differ By Month Across Genders? 
+```{r}
+#Creating the Summarized Dataset for Men and Women 
+Gender_Trips <- filter(citi, gender!="unknown") %>% 
+  group_by(month, gender) %>%
+  summarize(Avg_Duration = mean(tripduration, na.rm = TRUE), Avg_Speed = mean(speed_MPH, na.rm = TRUE))
+
+#Graphing the Result 
+baseplot1 <- ggplot(data = Gender_Trips, aes(x=month, y = Avg_Duration, color = gender)) + labs(x = "Month (1 = September, 12 = December)", y = "Average Trip Duration (Seconds)") + xlim(1,12)
+gender_plot <- baseplot1 + geom_line() + scale_x_continuous(breaks = scales::pretty_breaks(n = 12)) 
+
+gender_plot 
+
+```
+<br>
+<br>
+
+On average, men appear to take shorter bicycle trips than women, though women took slightly shorter trips than men in April and November. This is likely due to men outpacing women during their bike trips, as is shown on the additional graph below. That said, both genders tend to take their longest trips during the summer months (6 to 9) and their shortest trips during the winter (12 & 1 to 2), suggesting that the weather plays a toll on the length of bike rides 
+
+```{r}
+#Graphing the Result 
+baseplot1 <- ggplot(data = Gender_Trips, aes(x=month, y = Avg_Speed, color = gender)) + labs(x = "Month (1 = September, 12 = December)", y = "Average Speed (MPH)") + xlim(1,12) 
+gender_plot <- baseplot1 + geom_line() + scale_x_continuous(breaks = scales::pretty_breaks(n = 12)) 
+gender_plot 
+```
+
+
