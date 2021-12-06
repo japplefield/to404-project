@@ -205,7 +205,7 @@ util_map
 ```{r, cache = TRUE}
 # Setting up Google Maps for GGMap
 library(ggmap)
-register_google(key = "AIzaSyA5mOf170yvTi2Z4G711dLQ82TiEMWexnY", account_type = "standard")
+register_google(key = " ", account_type = "standard")
 base_nyc <- get_map(location = c(lon = -73.9857, lat =40.7484 ), zoom = 12, size = c(640,640) )
 
 # Cleaning Data
