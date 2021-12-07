@@ -21,6 +21,7 @@ library(tidyverse)
 library(ggplot2)
 library(gganimate)
 library(leaflet)
+library(janitor)
 ```
 
 #Citibike Team # Group Project  
@@ -29,9 +30,6 @@ library(leaflet)
 citi <- read_csv("citicleaned.csv")
 # citi <- read_csv("citiall.csv")
 
-
-
-library(janitor)
 citi <- clean_names(citi)
 
 citi$start_station_name <- as.factor(citi$start_station_name)
@@ -41,8 +39,6 @@ citi$end_station_id <- as.factor(citi$end_station_id)
 citi$usertype <- as.factor(citi$usertype)
 citi$gender <- as.factor(citi$gender)
 citi$dayid <- as.factor(citi$dayid)
-
-# citi$month <- as.factor(citi$month)
 
 str(citi)
 ```
@@ -100,16 +96,28 @@ weekday_vs_weekend <- weekday_usage %>%
 ```
 
 ```{r}
+daily_usage_by_month <- citi %>%
+  group_by(dayid, month, day, bikeid) %>%
+  summarize(num_rides = n())
 
-weekday_vs_weekend_by_month <- citi %>%
-  group_by(month, dayid) %>%
-  summarize(avg_rides = mean(n()))
+weekday_vs_weekend_by_month <- daily_usage_by_month %>%
+  group_by(dayid, month, bikeid) %>%
+  summarize(avg_rides = mean(num_rides)) %>%
+  ungroup()
 
-gif <- weekday_vs_weekend_by_month %>% ggplot(aes(x = month, y = avg_rides, color = dayid)) +
-  scale_x_continuous(breaks = seq(1, 12, by = 1)) +
-  geom_line() +
-  transition_reveal(month)
-# anim_save("g.gif", gif)
+weekday_usage_by_month <- weekday_vs_weekend_by_month %>%
+  filter(dayid == "Weekday") %>%
+  select(bikeid, avg_rides, month) %>%
+  rename(avg_weekday_rides = avg_rides)
+
+weekend_usage_by_month <- weekday_vs_weekend_by_month %>%
+  filter(dayid == "Weekend") %>%
+  select(bikeid, avg_rides, month) %>%
+  rename(avg_weekend_rides = avg_rides)
+
+weekday_vs_weekend_by_month <- weekday_usage_by_month %>%
+  full_join(weekend_usage_by_month) %>%
+  mutate_all(~ replace(., is.na(.), 0))
 ```
 
 ### What bikes are used the most?
