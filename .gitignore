@@ -47,3 +47,4 @@ po/*~
 # CSVs to ignore
 2019*
 citibike.csv
+citiall.csv
