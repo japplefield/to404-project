@@ -1,0 +1,292 @@
+---
+title: "Asymmetric Traffic"
+author: "Ian Cooper"
+date: "12/2/2021"
+output: 
+  html_document:
+    code_folding: hide
+  pd_document: default
+    
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE) 
+knitr::opts_chunk$set(cache= TRUE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+```{r, eval = FALSE}
+install.packages("ggplot2")
+install.packages("gganimate")
+install.packages("dplyr")
+install.packages("tidyr")
+install.packages("stringr")
+install.packages("geosphere")
+install.packages("leaflet")
+install.packages("tigris")
+install.packages("sp")
+install.packages("ggmap")
+install.packages("maptools")
+install.packages("broom")
+install.packages("httr")
+install.packages("rgdal")
+install.packages("rmarkdown")
+```
+
+```{r, cache =FALSE}
+library(dplyr)
+library(gganimate)
+library(tidyr)
+library(stringr)
+library(geosphere)
+library(leaflet)
+library(rmarkdown)
+
+```
+
+
+```{r, cache = TRUE}
+# Structure of the data
+citi <- read.csv("citicleaned.csv")
+
+# Additional cleaning
+citi$start.station.name <- as.factor(citi$start.station.name)
+citi$end.station.name <- as.factor(citi$end.station.name)
+
+# Ideas:
+  # Stations with the highest number of riders departing
+  # Stations with the highest number of riders arriving
+  # Following bikes through their routes gif
+  # Daily traffic volume (number of rides) by neighborhood?
+  # Volume of traffic by neighborhood 
+    # Probably have to add neighborhood columns, correlating with the lat/long of each station
+  # Average bike deficit and surplus across different neighborhoods
+  # % Utilization based on % of highest utilized station (based on total = number of arrivals + number of departures?)
+    # We know the total number of bikes (based on bike id). So can we show the % utilization based on the stations with the highest % of bikes starting and /or stopping at that station daily/yearly?
+      # Make daily gif of station utilization?
+  # Most popular routes start.station to end.station - show top 5-10 traffic patterns?
+  
+
+```
+
+```{r, cache = TRUE}
+library(dplyr)
+library(leaflet)
+
+# Stations with the highest number of departures
+departures <- citi %>%
+  group_by(station = `start.station.name`, latitude = `start.station.latitude`, longitude = `start.station.longitude`) %>%
+  summarise(departure_count = n())
+
+top_departures_sort <- head(departures[order(departures$departure_count, decreasing = TRUE),], n = 10)
+
+departure_map <- leaflet(top_departures_sort) %>%
+  addTiles() %>%
+  setView(lat = 40.749773343979214, lng = -73.98552506559191, zoom = 12) %>%
+  addCircleMarkers(lat = top_departures_sort$latitude, lng = top_departures_sort$longitude,
+                   popup = paste(top_departures_sort$station, "<br>", top_departures_sort$departure_count, "<br>"),
+                   radius = (top_departures_sort$departure_count / 100), color = "navy")
+departure_map
+
+# Stations with the highest number of arrivals
+arrivals <- citi %>%
+  group_by(station = `end.station.name`, latitude = `end.station.latitude`, longitude = `end.station.longitude`) %>%
+  summarise(arrival_count = n())
+
+top_arrivals_sort <- head(arrivals[order(arrivals$arrival_count, decreasing = TRUE),], n = 10)
+
+arrival_map <- leaflet(top_arrivals_sort) %>%
+  addTiles() %>%
+  setView(lat = 40.749773343979214, lng = -73.98552506559191, zoom = 12) %>%
+  addCircleMarkers(lat = top_arrivals_sort$latitude, lng = top_arrivals_sort$longitude,
+                   popup = paste(top_arrivals_sort$station, "<br>", top_arrivals_sort$arrival_count, "<br>"),
+                   radius = (top_arrivals_sort$arrival_count / 100), color = "navy")
+arrival_map          
+  
+```
+
+```{r}
+bike_deficit <- merge(departures, arrivals, all = TRUE)
+
+bike_deficit[is.na(bike_deficit)] <- 0
+
+bike_deficit$deficit <- bike_deficit$departure_count - bike_deficit$arrival_count
+
+leaflet(bike_deficit) %>% 
+  addTiles() %>%
+  setView(-74, 40.75, zoom = 11.5) %>%
+  addCircleMarkers(lng = bike_deficit$longitude, lat = bike_deficit$latitude, 
+                   popup = paste(bike_deficit$station, "<br>", ifelse(bike_deficit$deficit>=0, "Bike deficit = ", "Bike surplus = "), 
+                                abs(bike_deficit$deficit)), 
+                   radius = abs(bike_deficit$deficit)/5, color = ifelse(bike_deficit$deficit>0, "red", "green"))
+
+
+```
+
+```{r, cache = TRUE}
+library(tigris)
+library(dplyr)
+library(leaflet)
+library(sp)
+library(ggmap)
+library(maptools)
+library(broom)
+library(httr)
+library(rgdal)
+
+# Loading NYC Geospatial Data from Open-Source Library
+nyc_boroughs_data <- GET('http://data.beta.nyc//dataset/0ff93d2d-90ba-457c-9f7e-39e47bf2ac5f/resource/35dd04fb-81b3-479b-a074-a27a37888ce7/download/d085e2f8d0b54d4590b1e7d1f35594c1pediacitiesnycneighborhoods.geojson')
+
+#Reading the spatial data
+neighborhoods <- readOGR(content(nyc_boroughs_data, 'text'), 'OGRGeoJSON', verbose = F)
+
+
+nyc <- data.frame(lat= citi$start.station.latitude, lng= citi$start.station.longitude, start.station.name = citi$start.station.name)
+
+# Testing NYC Neighborhoods Map
+nyc_neighborhoods_map <- leaflet(neighborhoods) %>%
+  addTiles() %>%
+  addPolygons(popup = ~neighborhood, color = "navy", weight = 2) %>%
+  addProviderTiles("CartoDB.Positron")
+nyc_neighborhoods_map
+
+# Number of Stations by Neighborhood
+nyc <- nyc %>%
+  group_by(station = `start.station.name`, lat = `lat`, lng = `lng`) %>%
+  summarise(departure_count = n())
+
+nyc_spdf <- nyc
+coordinates(nyc_spdf) <- ~lng + lat
+proj4string(nyc_spdf) <- proj4string(neighborhoods)
+matches <- over(nyc_spdf, neighborhoods)
+nyc <- cbind(nyc, matches)
+
+# Cleaning up Data
+nyc$neighborhood <- as.factor(nyc$neighborhood)
+nyc$borough <- as.factor(nyc$borough)
+nyc$boroughCode <- as.factor(nyc$boroughCode)
+
+# Stations by Neighborhood, Sized by Number of Departures
+dep_size_map <- leaflet(neighborhoods) %>%
+  addTiles() %>% 
+  addPolygons(popup = ~neighborhood, color = "navy", weight = 2) %>% 
+  addCircleMarkers(~lng, ~lat,popup = paste(nyc$station, "<br>", nyc$neighborhood, "<br>", nyc$borough, "<br>", nyc$departure_count, "Departures"), data = nyc,
+                   color = "yellow", radius = nyc$departure_count / 100) %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  setView(-73.98, 40.75, zoom = 13)
+dep_size_map
+
+# Grouping Number of Stations by Neighborhood
+stations_by_neighborhood <- nyc %>%
+  group_by(neighborhood) %>%
+  summarize(num_stations = n())
+
+# Merging Spatial Polygon Map with Grouped Dataframe
+map_data <- geo_join(neighborhoods, stations_by_neighborhood, by_sp = "neighborhood", by_df = "neighborhood")
+
+map_data <- subset(map_data, num_stations != "NA")
+
+pal <- colorNumeric(palette = "Greens",
+                    domain = range(map_data@data$num_stations, na.rm = TRUE))
+
+# Neighborhoods Color-Coded by Number of CitiBike Stations
+num_stations_by_neighborhood <- leaflet(map_data) %>%
+  addTiles() %>%
+  addPolygons(fillColor = ~pal(num_stations), popup = paste(map_data$neighborhood, "<br>", map_data$borough,
+                                                            "<br>",map_data$num_stations,"stations"),
+              color = "black", weight = 1) %>%
+  addLegend(pal = pal, values = ~num_stations, title = "Number of Stations") %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  setView(-73.98, 40.75, zoom = 12)
+# num_stations_by_neighborhood <- addLegend(map = num_stations_by_neighborhood, colors = )
+num_stations_by_neighborhood
+
+```
+
+```{r, cache = TRUE}
+# Creating New Dataframe for Utilization 
+citi_util <- merge(departures, arrivals)
+
+# Utilization Rate
+citi_util$util_rate <- citi_util$departure_count / (citi_util$departure_count + citi_util$arrival_count)
+
+# Stations Sized by Utilization Rate
+util_map <- leaflet(citi_util) %>%
+  addTiles() %>%
+  addCircles(lat = citi_util$latitude, lng = citi_util$longitude, 
+                   popup = paste(citi_util$station, "<br>", (round(citi_util$util_rate * 100, 1)), "%"),
+                   radius = (citi_util$util_rate*10)^2 , color = "navy", fillOpacity = 1)
+util_map
+```
+
+```{r, cache = TRUE}
+# Setting up Google Maps for GGMap
+library(ggmap)
+register_google(key = "AIzaSyA5mOf170yvTi2Z4G711dLQ82TiEMWexnY", account_type = "standard")
+base_nyc <- get_map(location = c(lon = -73.9857, lat =40.7484 ), zoom = 12, size = c(640,640) )
+
+# Cleaning Data
+library(lubridate)
+citi$starttime <- as.POSIXct(strptime(citi$starttime, "%Y-%m-%d %H:%M:%S"))
+citi$stoptime <- as.POSIXct(strptime(citi$stoptime, "%Y-%m-%d %H:%M:%S"))
+citi$starthour <- hour(citi$starttime)
+citi$day <- as.Date(citi$starttime)
+citi$month <- as.factor(month(citi$starttime))
+citi$numWeekday <- wday(citi$starttime)
+citi$dayid <- as.factor(ifelse(citi$numWeekday < 6, "Weekday", "Weekend"))
+citi$weekNum <- as.numeric(strftime(citi$starttime, format = "%V"))
+
+
+citi_ggmap_2 <- citi %>%
+  group_by(day = day, starttime = starttime, lng = start.station.longitude, lat = start.station.latitude,
+           station = start.station.name) %>%
+  summarize(dep = n()) %>%
+  filter(day == "2019-06-01")
+
+citi_ggmap_2
+
+library(ggplot2)
+library(gganimate)
+
+# Animated Departure Map over One Day
+dep_map <- ggmap(base_nyc) +
+  geom_point(citi_ggmap_2, mapping = aes(x = citi_ggmap_2$lng, y = citi_ggmap_2$lat), size = 5, color = "red") +
+  transition_states(citi_ggmap_2$starttime) +
+  shadow_mark(color = "black")
+dep_map
+```
+
+```{r, cache = TRUE}
+citi_ggmap_3 <- citi %>%
+  group_by(day = day, stoptime = stoptime, lng = end.station.longitude, lat = end.station.latitude,
+           station = end.station.name) %>%
+  summarize(arr = n()) %>%
+  filter(day == "2019-06-01")
+citi_ggmap_3
+
+# Animated Arrival Map over One Day
+library(ggcats)
+arr_map <- ggmap(base_nyc) +
+  geom_cat(citi_ggmap_3, mapping = aes(x = citi_ggmap_3$lng, y = citi_ggmap_3$lat), size = 4, cat = "toast") +
+  transition_states(citi_ggmap_3$stoptime) +
+  shadow_mark(past = TRUE)
+arr_map
+```
+
+```{r, cache = TRUE}
+citi_ggmap_4 <- citi %>%
+  group_by(day = day, station = start.station.name, lng = start.station.longitude, lat = start.station.latitude) %>%
+  summarize(dep = n())
+citi_ggmap_4
+
+# Animate Heat Map of Departures Over ~2 Months
+heatmap <- ggmap(base_nyc) +
+  geom_bin_2d(data = citi_ggmap_4, mapping = aes(x = citi_ggmap_4$lng, y = citi_ggmap_4$lat), bins = 40) +
+  transition_states(citi_ggmap_4$day) +
+  labs(title = "Date: {closest_state}")
+heatmap
+
+```
+
+
