@@ -10,7 +10,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_chunk$set(cache = TRUE)
+# knitr::opts_chunk$set(cache = TRUE)
 knitr::opts_chunk$set(message = FALSE)
 knitr::opts_chunk$set(warning = FALSE)
 ```
@@ -39,6 +39,8 @@ citi$usertype <- as.factor(citi$usertype)
 citi$gender <- as.factor(citi$gender)
 citi$dayid <- as.factor(citi$dayid)
 
+# citi$month <- as.factor(citi$month)
+
 str(citi)
 ```
 
@@ -52,13 +54,6 @@ I'm seeking to answer the following questions:
 ```{r}
 daily_usage <- citi %>%
   group_by(dayid, day, bikeid) %>%
-  summarize(num_rides = n())
-```
-
-#### Number of Rides per Bike
-```{r}
-bike_usage <- citi %>%
-  group_by(bikeid) %>%
   summarize(num_rides = n())
 ```
 
@@ -83,8 +78,10 @@ weekday_vs_weekend_by_month <- citi %>%
   group_by(month, dayid) %>%
   summarize(avg_rides = mean(n()))
 
-weekday_vs_weekend_by_month %>% ggplot(aes(x = month, y = avg_rides, color = dayid)) +
-  geom_line()
+gif <- weekday_vs_weekend_by_month %>% ggplot(aes(x = month, y = avg_rides, color = dayid)) + 
+  scale_x_continuous(breaks = seq(1, 12, by = 1)) +
+  geom_line() + transition_reveal(month)
+anim_save("g.gif", gif)
 ```
 
 ### How does bike usage change season to season?
@@ -93,18 +90,27 @@ weekday_vs_weekend_by_month %>% ggplot(aes(x = month, y = avg_rides, color = day
 ```
 
 ### What bikes are used the most?
-```{r}
 
+#### Number of Rides per Bike
+```{r}
+bike_usage <- citi %>%
+  group_by(bikeid) %>%
+  summarize(num_rides = n())
 ```
 
 ### Do certain bikes make it back to the same stations?
 ```{r}
-
+bike_return <- citi %>%
+  group_by(end_station_id, bikeid) %>%
+  summarize(num_returns = n()) %>%
+  filter(num_returns > 2)
 ```
 
 ### How many trips do certain bikes take per day?
 ```{r}
-
+bike_daily_usage <- citi %>%
+  group_by(day, bikeid) %>%
+  summarize(num_rides = n())
 ```
 
 ### Where do bikes travel (on a map)?
