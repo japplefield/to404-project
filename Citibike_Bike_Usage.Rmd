@@ -40,6 +40,7 @@ citi$usertype <- as.factor(citi$usertype)
 citi$gender <- as.factor(citi$gender)
 citi$dayid <- as.factor(citi$dayid)
 
+
 str(citi)
 ```
 
@@ -56,6 +57,20 @@ daily_usage <- citi %>%
   summarize(num_rides = n())
 ```
 
+```{r}
+daily_usage %>% 
+  ggplot(aes(x = num_rides)) + geom_histogram()
+
+daily_usage %>%
+  filter(num_rides > 2) %>%
+  nrow()
+
+daily_usage %>%
+  filter(num_rides > 3) %>%
+  nrow()
+```
+
+
 #### Average number of rides per given bike
 ```{r}
 avg_bike_usage <- daily_usage %>%
@@ -63,6 +78,12 @@ avg_bike_usage <- daily_usage %>%
   summarize(avg_num_rides = mean(num_rides)) %>%
   arrange(desc(avg_num_rides))
 ```
+
+```{r}
+avg_bike_usage %>%
+  ggplot(aes(x=avg_num_rides)) + geom_histogram()
+```
+
 
 ### How does bike usage change month to month?
 
@@ -73,28 +94,41 @@ monthly_usage <- citi %>%
   summarize(num_rides = n())
 ```
 
+```{r}
+monthly_usage %>%
+  ggplot(aes(x=num_rides)) + geom_histogram() + facet_wrap(~month)
+```
+
+
 ### How does bike usage change between weekdays and weekends?
+
+#### At all?
 ```{r}
 weekday_vs_weekend <- daily_usage %>%
   group_by(dayid, bikeid) %>%
   summarize(avg_rides = mean(num_rides)) %>%
   ungroup()
 
-weekday_usage <- weekday_vs_weekend %>%
-  filter(dayid == "Weekday") %>%
-  select(bikeid, avg_rides) %>%
-  rename(avg_weekday_rides = avg_rides)
-
-weekend_usage <- weekday_vs_weekend %>%
-  filter(dayid == "Weekend") %>%
-  select(bikeid, avg_rides) %>%
-  rename(avg_weekend_rides = avg_rides)
-
-weekday_vs_weekend <- weekday_usage %>%
-  full_join(weekend_usage) %>%
-  mutate_all(~ replace(., is.na(.), 0))
+# weekday_usage <- weekday_vs_weekend %>%
+#   filter(dayid == "Weekday") %>%
+#   select(bikeid, avg_rides) %>%
+#   rename(avg_weekday_rides = avg_rides)
+# 
+# weekend_usage <- weekday_vs_weekend %>%
+#   filter(dayid == "Weekend") %>%
+#   select(bikeid, avg_rides) %>%
+#   rename(avg_weekend_rides = avg_rides)
+# 
+# weekday_vs_weekend <- weekday_usage %>%
+#   full_join(weekend_usage) %>%
+#   mutate_all(~ replace(., is.na(.), 0))
 ```
 
+```{r}
+
+```
+
+#### Month to month?
 ```{r}
 daily_usage_by_month <- citi %>%
   group_by(dayid, month, day, bikeid) %>%
@@ -105,19 +139,19 @@ weekday_vs_weekend_by_month <- daily_usage_by_month %>%
   summarize(avg_rides = mean(num_rides)) %>%
   ungroup()
 
-weekday_usage_by_month <- weekday_vs_weekend_by_month %>%
-  filter(dayid == "Weekday") %>%
-  select(bikeid, avg_rides, month) %>%
-  rename(avg_weekday_rides = avg_rides)
-
-weekend_usage_by_month <- weekday_vs_weekend_by_month %>%
-  filter(dayid == "Weekend") %>%
-  select(bikeid, avg_rides, month) %>%
-  rename(avg_weekend_rides = avg_rides)
-
-weekday_vs_weekend_by_month <- weekday_usage_by_month %>%
-  full_join(weekend_usage_by_month) %>%
-  mutate_all(~ replace(., is.na(.), 0))
+# weekday_usage_by_month <- weekday_vs_weekend_by_month %>%
+#   filter(dayid == "Weekday") %>%
+#   select(bikeid, avg_rides, month) %>%
+#   rename(avg_weekday_rides = avg_rides)
+# 
+# weekend_usage_by_month <- weekday_vs_weekend_by_month %>%
+#   filter(dayid == "Weekend") %>%
+#   select(bikeid, avg_rides, month) %>%
+#   rename(avg_weekend_rides = avg_rides)
+# 
+# weekday_vs_weekend_by_month <- weekday_usage_by_month %>%
+#   full_join(weekend_usage_by_month) %>%
+#   mutate_all(~ replace(., is.na(.), 0))
 ```
 
 ### What bikes are used the most?
@@ -127,25 +161,51 @@ weekday_vs_weekend_by_month <- weekday_usage_by_month %>%
 bike_usage <- citi %>%
   group_by(bikeid) %>%
   summarize(num_rides = n()) %>%
-  arrange(bikeid)
+  arrange(desc(num_rides))
 ```
 
+```{r}
+bike_usage %>%
+  ggplot(aes(x=num_rides)) + geom_histogram()
+```
+
+
 ### Do certain bikes make it back to the same stations?
+
+```{r}
+station_info <- citi %>% group_by(end_station_id) %>% arrange(end_station_id) %>% filter(row_number() == 1) %>% ungroup() %>% distinct(end_station_id, end_station_name, end_station_latitude, end_station_longitude)
+```
 
 #### Ever?
 ```{r}
 bike_return_ever <- citi %>%
   group_by(end_station_id, bikeid) %>%
-  summarize(num_returns = n())
+  summarize(num_returns = n()) %>%
+  arrange(desc(num_returns)) %>%
+  left_join(station_info)
 ```
+
+```{r}
+
+```
+
 
 #### On the same day?
 ```{r}
 bike_return_day <- citi %>%
   group_by(day, end_station_id, bikeid) %>%
   summarize(num_returns = n()) %>%
-  arrange(num_returns)
+  arrange(num_returns) %>%
+  left_join(station_info)
 ```
+
+```{r}
+  leaflet(bike_return_day) %>% 
+  setView(-74, 40.75, zoom = 11.5) %>%
+  addMarkers(lng = ~end_station_longitude, lat = ~end_station_latitude, 
+                   popup = paste(~bikeid, ~end_station_name, "<br>", ~num_returns))
+```
+
 
 ### How many trips do certain bikes take per day?
 ```{r}
@@ -153,6 +213,11 @@ bike_daily_usage <- citi %>%
   group_by(day, bikeid) %>%
   summarize(num_rides = n())
 ```
+
+```{r}
+
+```
+
 
 ### Where do bikes travel (on a map)?
 ```{r}
