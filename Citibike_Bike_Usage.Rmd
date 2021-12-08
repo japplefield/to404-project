@@ -10,7 +10,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_chunk$set(cache = TRUE)
+# knitr::opts_chunk$set(cache = TRUE)
 knitr::opts_chunk$set(message = FALSE)
 knitr::opts_chunk$set(warning = FALSE)
 ```
@@ -21,14 +21,15 @@ library(tidyverse)
 library(ggplot2)
 library(gganimate)
 library(leaflet)
+library(janitor)
 ```
 
 #Citibike Team # Group Project  
 ```{r}
 # Observing the Data
 citi <- read_csv("citicleaned.csv")
+# citi <- read_csv("citiall.csv")
 
-library(janitor)
 citi <- clean_names(citi)
 
 citi$start_station_name <- as.factor(citi$start_station_name)
@@ -38,6 +39,7 @@ citi$end_station_id <- as.factor(citi$end_station_id)
 citi$usertype <- as.factor(citi$usertype)
 citi$gender <- as.factor(citi$gender)
 citi$dayid <- as.factor(citi$dayid)
+
 
 str(citi)
 ```
@@ -55,61 +57,211 @@ daily_usage <- citi %>%
   summarize(num_rides = n())
 ```
 
+```{r}
+daily_usage %>%
+  ggplot(aes(x = num_rides)) +
+  geom_histogram()
+
+daily_usage %>%
+  filter(num_rides > 2) %>%
+  nrow()
+
+daily_usage %>%
+  filter(num_rides > 3) %>%
+  nrow()
+```
+
+
+#### Average number of rides per given bike
+```{r}
+avg_bike_usage <- daily_usage %>%
+  group_by(bikeid) %>%
+  summarize(avg_num_rides = mean(num_rides)) %>%
+  arrange(desc(avg_num_rides))
+```
+
+```{r}
+avg_bike_usage %>%
+  ggplot(aes(x = avg_num_rides)) +
+  geom_histogram()
+```
+
+
+### How does bike usage change month to month?
+
+#### Number of Rides per bike per Month
+```{r}
+monthly_usage <- citi %>%
+  group_by(month, bikeid) %>%
+  summarize(num_rides = n())
+```
+
+```{r}
+monthly_usage %>%
+  ggplot(aes(x = num_rides)) +
+  geom_histogram() +
+  facet_wrap(~month)
+```
+
+
+### How does bike usage change between weekdays and weekends?
+
+#### At all?
+```{r}
+weekday_vs_weekend <- daily_usage %>%
+  group_by(dayid, bikeid) %>%
+  summarize(avg_rides = mean(num_rides)) %>%
+  ungroup()
+
+# weekday_usage <- weekday_vs_weekend %>%
+#   filter(dayid == "Weekday") %>%
+#   select(bikeid, avg_rides) %>%
+#   rename(avg_weekday_rides = avg_rides)
+#
+# weekend_usage <- weekday_vs_weekend %>%
+#   filter(dayid == "Weekend") %>%
+#   select(bikeid, avg_rides) %>%
+#   rename(avg_weekend_rides = avg_rides)
+#
+# weekday_vs_weekend <- weekday_usage %>%
+#   full_join(weekend_usage) %>%
+#   mutate_all(~ replace(., is.na(.), 0))
+```
+
+```{r}
+
+```
+
+#### Month to month?
+```{r}
+daily_usage_by_month <- citi %>%
+  group_by(dayid, month, day, bikeid) %>%
+  summarize(num_rides = n())
+
+weekday_vs_weekend_by_month <- daily_usage_by_month %>%
+  group_by(dayid, month, bikeid) %>%
+  summarize(avg_rides = mean(num_rides)) %>%
+  ungroup()
+
+# weekday_usage_by_month <- weekday_vs_weekend_by_month %>%
+#   filter(dayid == "Weekday") %>%
+#   select(bikeid, avg_rides, month) %>%
+#   rename(avg_weekday_rides = avg_rides)
+#
+# weekend_usage_by_month <- weekday_vs_weekend_by_month %>%
+#   filter(dayid == "Weekend") %>%
+#   select(bikeid, avg_rides, month) %>%
+#   rename(avg_weekend_rides = avg_rides)
+#
+# weekday_vs_weekend_by_month <- weekday_usage_by_month %>%
+#   full_join(weekend_usage_by_month) %>%
+#   mutate_all(~ replace(., is.na(.), 0))
+```
+
+### What bikes are used the most?
+
 #### Number of Rides per Bike
 ```{r}
 bike_usage <- citi %>%
   group_by(bikeid) %>%
-  summarize(num_rides = n())
+  summarize(num_rides = n()) %>%
+  arrange(desc(num_rides))
 ```
 
-#### Average number of 
-
-### How does bike usage change month to month?
-
-#### Number of Rides per Month
 ```{r}
-monthly_usage <- citi %>%
-  group_by(month) %>%
-  summarize(num_rides = n())
+bike_usage %>%
+  ggplot(aes(x = num_rides)) +
+  geom_histogram()
 ```
 
-### How does bike usage change between weekdays and weekends?
-```{r}
-weekday_vs_weekend <- daily_usage %>%
-  group_by(dayid) %>%
-  summarize(avg_rides = mean(num_rides))
-
-weekday_vs_weekend_by_month <- citi %>%
-  group_by(month, dayid) %>%
-  summarize(avg_rides = mean(n()))
-
-weekday_vs_weekend_by_month %>% ggplot(aes(x = month, y = avg_rides, color = dayid)) +
-  geom_line()
-```
-
-### How does bike usage change season to season?
-```{r}
-
-```
-
-### What bikes are used the most?
-```{r}
-
-```
 
 ### Do certain bikes make it back to the same stations?
-```{r}
 
+```{r}
+station_info <- citi %>%
+  group_by(end_station_id) %>%
+  arrange(end_station_id) %>%
+  filter(row_number() == 1) %>%
+  ungroup() %>%
+  distinct(end_station_id, end_station_name, latitude = end_station_latitude, longitude = end_station_longitude)
 ```
 
-### How many trips do certain bikes take per day?
+#### Ever?
 ```{r}
-
+bike_return_ever <- citi %>%
+  group_by(end_station_id, bikeid) %>%
+  summarize(num_returns = n()) %>%
+  arrange(desc(num_returns)) %>%
+  left_join(station_info) %>%
+  head(n = 20)
 ```
 
-### Where do bikes travel (on a map)?
 ```{r}
+leaflet(bike_return_ever) %>%
+  addTiles() %>%
+  setView(-74, 40.75, zoom = 11.5) %>%
+  addMarkers(
+    lng = ~longitude, lat = ~latitude,
+    popup = paste(bike_return_ever$bikeid, bike_return_ever$end_station_name, "<br>", bike_return_ever$num_returns)
+  )
+```
 
+
+#### On the same day?
+```{r}
+bike_return_day <- citi %>%
+  group_by(day, end_station_id, bikeid) %>%
+  summarize(num_returns = n()) %>%
+  arrange(desc(num_returns)) %>%
+  left_join(station_info) %>%
+  head(n = 20)
+```
+
+```{r}
+leaflet(bike_return_day) %>%
+  addTiles() %>%
+  setView(-74, 40.75, zoom = 11.5) %>%
+  addMarkers(
+    lng = ~longitude, lat = ~latitude,
+    popup = paste(bike_return_day$bikeid, bike_return_day$end_station_name, "<br>", bike_return_day$num_returns)
+  )
+```
+
+
+### How do the most used bikes move on their active days?
+```{r}
+bike_daily_usage <- citi %>%
+  arrange(starttime) %>%
+  group_by(day, bikeid) %>%
+  mutate(num_rides = n(), first_ride = row_number() == 1, last_ride = row_number() == n()) %>%
+  arrange(desc(num_rides)) %>%
+  filter(first_ride | last_ride) %>%
+  head(n = 20)
+
+active_firsts <- bike_daily_usage %>%
+  filter(first_ride) %>%
+  select(bikeid, day, start_station_id, start_station_latitude, start_station_longitude, start_station_name)
+
+active_lasts <- bike_daily_usage %>%
+  filter(last_ride) %>%
+  select(bikeid, day, end_station_id, end_station_latitude, end_station_longitude, end_station_name)
+
+bike_daily_usage <- active_firsts %>%
+  full_join(active_lasts)
+```
+
+```{r}
+library(leaflet.minicharts)
+leaflet(bike_daily_usage) %>%
+  addTiles() %>%
+  setView(-74, 40.75, zoom = 11.5) %>%
+  addFlows(
+    lng0 = bike_daily_usage$start_station_longitude,
+    lng1 = bike_daily_usage$end_station_longitude,
+    lat0 = bike_daily_usage$start_station_latitude,
+    lat1 = bike_daily_usage$end_station_latitude,
+    maxThickness = 3
+  )
 ```
 
 
