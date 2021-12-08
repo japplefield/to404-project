@@ -22,13 +22,14 @@ library(ggplot2)
 library(gganimate)
 library(leaflet)
 library(janitor)
+library(leaflet.minicharts)
 ```
 
 #Citibike Team # Group Project  
 ```{r}
 # Observing the Data
-citi <- read_csv("citicleaned.csv")
-# citi <- read_csv("citiall.csv")
+# citi <- read_csv("citicleaned.csv")
+citi <- read_csv("citiall.csv")
 
 citi <- clean_names(citi)
 
@@ -251,7 +252,6 @@ bike_daily_usage <- active_firsts %>%
 ```
 
 ```{r}
-library(leaflet.minicharts)
 leaflet(bike_daily_usage) %>%
   addTiles() %>%
   setView(-74, 40.75, zoom = 11.5) %>%

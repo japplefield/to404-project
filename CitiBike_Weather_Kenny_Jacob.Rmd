@@ -11,7 +11,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_chunk$set(cache = TRUE)
+# knitr::opts_chunk$set(cache = TRUE)
 knitr::opts_chunk$set(message = FALSE)
 knitr::opts_chunk$set(warning = FALSE)
 ```
@@ -19,19 +19,17 @@ knitr::opts_chunk$set(warning = FALSE)
 
 # What Does the Data Look Like?
 ```{r}
-#Reading the Libraries
-library(ggpubr)
+# Reading the Libraries
 library(ggplot2)
-library(dplyr)
+library(tidyverse)
 library(gganimate)
-library(tidyr)
-library(stringr)
-library(geosphere)
 library(leaflet)
 library(janitor)
+library(ggpubr)
 
-#Importing the data
-citi <- read.csv("citicleaned.csv")
+# Importing the data
+# citi <- read.csv("citicleaned.csv")
+citi <- read_csv("citiall.csv")
 citi <- clean_names(citi)
 
 citi$start_station_name <- as.factor(citi$start_station_name)
@@ -41,29 +39,36 @@ citi$end_station_id <- as.factor(citi$end_station_id)
 citi$usertype <- as.factor(citi$usertype)
 citi$gender <- as.factor(citi$gender)
 citi$dayid <- as.factor(citi$dayid)
-citi$DATE <- as.Date(citi$starttime, format = "%Y-%m-%d")
+```
 
-#str(citi)
+```{r}
 
-weather <- read.csv("NYCWeather2019.csv")
+# str(citi)
+
+weather <- read_csv("NYCWeather2019.csv")
 weather$STATION <- NULL
 weather$NAME <- NULL
-weather$DATE <- as.Date(weather$DATE, format= "%m/%d/%Y")
-weather$TAVG <- (weather$TMAX + weather$TMIN)/2
+weather$DATE <- as.Date(weather$DATE, format = "%m/%d/%Y")
+weather$TAVG <- (weather$TMAX + weather$TMIN) / 2
 
-#str(weather)
+# str(weather)
+```
 
-citimerged <- merge(citi,weather, by = "DATE")
+```{r}
+
+citimerged <- left_join(citi, weather, by = c("day" = "DATE"))
 str(citimerged)
-View(citimerged)
-
 ```
 
 
 # Does Temperature Affect the Number of Trips that are Taken?
 ```{r}
-#Bar Chart of Rides Based on Temperature
-tempgenderchart <- ggplot(citimerged, aes(x = TAVG, fill = gender)) + geom_histogram() + xlab("Temperature") + ylab("Number of Trips Taken") + ggtitle("Histogram of Temp v. # of Trips Grouped by Gender")
+# Bar Chart of Rides Based on Temperature
+tempgenderchart <- ggplot(citimerged, aes(x = TAVG, fill = gender)) +
+  geom_histogram() +
+  xlab("Temperature") +
+  ylab("Number of Trips Taken") +
+  ggtitle("Histogram of Temp v. # of Trips Grouped by Gender")
 tempgenderchart
 ```
 
@@ -71,7 +76,12 @@ As we see here, there is a considerable amount of our consumer base that is male
 
 # How Does Temperature Change Across the Months?
 ```{r}
-animatetempchart <- ggplot(citimerged, aes(DATE, TAVG, group = month, colour = factor(month))) + geom_line() + xlab("Date") + ylab("Temperature") + ggtitle("Change in Temperature Over Time") + transition_reveal(DATE)
+animatetempchart <- ggplot(citimerged, aes(day, TAVG, group = month, colour = factor(month))) +
+  geom_line() +
+  xlab("Date") +
+  ylab("Temperature") +
+  ggtitle("Change in Temperature Over Time") +
+  transition_reveal(day)
 animatetempchart
 ```
 
@@ -79,7 +89,13 @@ This animated chart is meant to inform the management on temperature movements t
 
 # What effect does Temperature Have on the Speed of Riders?
 ```{r}
-tempspeedchart <- ggplot(citimerged, aes(x = TAVG, y = speed)) + geom_point(alpha = 0.2) + geom_smooth(method = lm) + stat_regline_equation() + xlab("Average Temperature") + ylab("Speed") + ggtitle("The Relationship  b/w Speed and Temp")
+tempspeedchart <- ggplot(citimerged, aes(x = TAVG, y = speed)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth(method = lm) +
+  stat_regline_equation() +
+  xlab("Average Temperature") +
+  ylab("Speed") +
+  ggtitle("The Relationship  b/w Speed and Temp")
 tempspeedchart
 ```
 
@@ -87,7 +103,13 @@ The main point of analyzing the speed of riders is to know how fast they are get
 
 # What Effect does Temperature Have on the Distance of Trips?
 ```{r}
-tempdistchart <- ggplot(citimerged, aes(x = TAVG, y = distmeters)) + geom_point(alpha = 0.2) + geom_smooth(method = lm) + stat_regline_equation() + xlab("Average Temperature") + ylab("Distance (Meters)") + ggtitle("Relationship b/w Distance and Temp")
+tempdistchart <- ggplot(citimerged, aes(x = TAVG, y = distmeters)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth(method = lm) +
+  stat_regline_equation() +
+  xlab("Average Temperature") +
+  ylab("Distance (Meters)") +
+  ggtitle("Relationship b/w Distance and Temp")
 tempdistchart
 ```
 
@@ -95,7 +117,13 @@ Simply put, this graph shows the relationship between distance traveled and the 
 
 # What Effect Does Precipitation Have on the Speed of Riders?
 ```{r}
-prcpspeedchart <- ggplot(citimerged, aes(x = PRCP, y = speed)) + geom_point(alpha = 0.2) + geom_smooth(method = lm) + stat_regline_equation() + xlab("Precipitation") + ylab("Speed") + ggtitle("Relationship b/w Precipitation and Speed")
+prcpspeedchart <- ggplot(citimerged, aes(x = PRCP, y = speed)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth(method = lm) +
+  stat_regline_equation() +
+  xlab("Precipitation") +
+  ylab("Speed") +
+  ggtitle("Relationship b/w Precipitation and Speed")
 prcpspeedchart
 ```
 
@@ -103,7 +131,13 @@ Obviously no one likes to be in the rain. This is why we have plotted the relati
 
 # What Effect Does Precipitation Have on the Distance of Trips?
 ```{r}
-prcpdistchart <- ggplot(citimerged, aes(x = PRCP, y = distmeters)) + geom_point(alpha = 0.2) + geom_smooth(method = lm) + stat_regline_equation() + xlab("Precipitation") + ylab("Distance (Meters)") + ggtitle("Relationship b/w Precipitation and Distance")
+prcpdistchart <- ggplot(citimerged, aes(x = PRCP, y = distmeters)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth(method = lm) +
+  stat_regline_equation() +
+  xlab("Precipitation") +
+  ylab("Distance (Meters)") +
+  ggtitle("Relationship b/w Precipitation and Distance")
 prcpdistchart
 ```
 
@@ -112,7 +146,11 @@ It makes sense that riders would travel less distance to stay out of the rain, b
 # Does Snow Impact the Number of Trips Taken?
 
 ```{r}
-tempuserchart <- ggplot(citimerged, aes(x = SNOW, fill = usertype)) + geom_histogram() + xlab("Snow") + ylab("Number of Trips Taken") + ggtitle("Histogram of Snow v. # of Trips Grouped by User Type")
+tempuserchart <- ggplot(citimerged, aes(x = SNOW, fill = usertype)) +
+  geom_histogram() +
+  xlab("Snow") +
+  ylab("Number of Trips Taken") +
+  ggtitle("Histogram of Snow v. # of Trips Grouped by User Type")
 tempuserchart
 ```
 
@@ -121,19 +159,33 @@ As expected, the *vast* majority of trips are taken when there is little to no s
 # Does Wind Impact the Number of Trips Taken?
 
 ```{r}
-snowgenderchart <- ggplot(citimerged, aes(x = AWND, fill = gender)) + geom_histogram() + xlab("Wind") + ylab("Number of Trips Taken") + ggtitle("Histogram of Wind v. # of Trips Grouped by Gender")
+snowgenderchart <- ggplot(citimerged, aes(x = AWND, fill = gender)) +
+  geom_histogram() +
+  xlab("Wind") +
+  ylab("Number of Trips Taken") +
+  ggtitle("Histogram of Wind v. # of Trips Grouped by Gender")
 snowgenderchart
 ```
 
 ```{r}
-tempuserchart <- ggplot(citimerged, aes(x = AWND, fill = usertype)) + geom_histogram() + xlab("Wind") + ylab("Number of Trips Taken") + ggtitle("Histogram of Wind v. # of Trips Grouped by User Type")
+tempuserchart <- ggplot(citimerged, aes(x = AWND, fill = usertype)) +
+  geom_histogram() +
+  xlab("Wind") +
+  ylab("Number of Trips Taken") +
+  ggtitle("Histogram of Wind v. # of Trips Grouped by User Type")
 tempuserchart
 ```
 
 # What Effect Does Wind Have on the Speed of Riders?
 
 ```{r}
-windspeedchart <- ggplot(citimerged, aes(x = AWND, y = speed)) + geom_point(alpha = 0.2) + geom_smooth(method = lm) + stat_regline_equation() + xlab("Wind") + ylab("Speed") + ggtitle("Relationship b/w Wind and Speed")
+windspeedchart <- ggplot(citimerged, aes(x = AWND, y = speed)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth(method = lm) +
+  stat_regline_equation() +
+  xlab("Wind") +
+  ylab("Speed") +
+  ggtitle("Relationship b/w Wind and Speed")
 windspeedchart
 ```
 
@@ -142,7 +194,13 @@ There is a significantly greater increase in rider speed when there is precipita
 # What Effect Does Wind Have on the Distance of Trips?
 
 ```{r}
-winddistchart <- ggplot(citimerged, aes(x = AWND, y = distmeters)) + geom_point(alpha = 0.2) + geom_smooth(method = lm) + stat_regline_equation() + xlab("Wind") + ylab("Distance (Meters)") + ggtitle("Relationship b/w Wind and Distance")
+winddistchart <- ggplot(citimerged, aes(x = AWND, y = distmeters)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth(method = lm) +
+  stat_regline_equation() +
+  xlab("Wind") +
+  ylab("Distance (Meters)") +
+  ggtitle("Relationship b/w Wind and Distance")
 winddistchart
 ```
 
@@ -151,7 +209,13 @@ Wind seems to have a minimal effect on how far bikers ride compared to the effec
 # Does Temperature Impact the Age of Riders?
 
 ```{r}
-tempagechart <- ggplot(citimerged, aes(x = TAVG, y = age, color = usertype)) + geom_point(alpha = 0.2) + geom_smooth(method = lm) + stat_regline_equation() + xlab("Temperature") + ylab("Age") + ggtitle("Relationship b/w Temperature and Age Grouped by User Type")
+tempagechart <- ggplot(citimerged, aes(x = TAVG, y = age, color = usertype)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth(method = lm) +
+  stat_regline_equation() +
+  xlab("Temperature") +
+  ylab("Age") +
+  ggtitle("Relationship b/w Temperature and Age Grouped by User Type")
 tempagechart
 ```
 
