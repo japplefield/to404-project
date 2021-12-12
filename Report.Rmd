@@ -92,13 +92,13 @@ tempgenderchart
 As we see here, there is a considerable amount of our consumer base that is male compared to female. That being said, the proportion remains fairly consistent across the different temperatures and should be a point of emphasis in our marketing. However, it should be noted that the number of trips as temperature increases is significant and should be noted for the months in which there are higher/lower temperatures. In terms of a utilization strategy, it makes sense that we should have less bikes on the street during the winter months, one because the data suggests that there is a significant correlation with the number of trips that are taken and the temperature. We suggest a utilization strategy that continues to increase the number of bikes on the street as the year goes on and the temperatures get warmer. It tracks in the other direction as well. As winter comes along, we should begin decreasing the number of bikes on the street.
 
 ## How Does Temperature Change Across the Months?
-```{r}
-animatetempchart <- ggplot(citimerged, aes(Date, TAVG, group = month, colour = factor(month))) +
+```{r, cache=TRUE}
+animatetempchart <- ggplot(citimerged, aes(day, TAVG, group = month, colour = factor(month))) +
     geom_line() +
     xlab("Date") +
     ylab("Temperature") +
     ggtitle("Change in Temperature Over Time") +
-    transition_reveal(as.numeric(Date))
+    transition_reveal(day)
 animatetempchart
 ```
 
