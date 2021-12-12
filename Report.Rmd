@@ -364,10 +364,11 @@ daily_usage <- citi %>%
 ```{r}
 daily_usage %>%
     ggplot(aes(x = num_rides)) +
-    geom_histogram()
+    geom_histogram() +
+    ggtitle("Number of Rides per Day per Bike") +
+    xlab("Number of Daily Rides") +
+    ylab("Count")
 ```
-
-TODO: Make above chart nicer labels
 
 The above histogram depicts the number of rides per day per bike. Most bikes are ridden very infrequently. The number of bikes with more than 2 rides per day is just `r daily_usage %>% filter(num_rides > 2) %>% nrow()`. The number of bikes with more than 3 rides per day is just `r daily_usage %>% filter(num_rides > 3) %>% nrow()`.
 
@@ -382,10 +383,11 @@ avg_bike_usage <- daily_usage %>%
 ```{r}
 avg_bike_usage %>%
     ggplot(aes(x = avg_num_rides)) +
-    geom_histogram()
+    geom_histogram() +
+    ggtitle("Average Number of Rides per Day per Bike") +
+    xlab("Average Number of Daily Rides") +
+    ylab("Count")
 ```
-
-TODO: Make above chart nicer labels
 
 The above histogram depicts the distribution of average daily rides across all bikes. TODO: Interpret histogram.
 
@@ -403,10 +405,11 @@ monthly_usage <- citi %>%
 monthly_usage %>%
     ggplot(aes(x = num_rides)) +
     geom_histogram() +
-    facet_wrap(~month)
+    facet_wrap(~month) +
+    ggtitle("Number of Rides per Day per Bike by Month") +
+    xlab("Number of Daily Rides") +
+    ylab("Count")
 ```
-
-TODO: Make above chart nicer labels
 
 The above histograms depict the distribution of the number of rides on each bike across each month.
 
@@ -423,10 +426,11 @@ bike_usage <- citi %>%
 ```{r}
 bike_usage %>%
     ggplot(aes(x = num_rides)) +
-    geom_histogram()
+    geom_histogram() +
+    ggtitle("Number of Rides per Bike") +
+    xlab("Number of Rides") +
+    ylab("Count")
 ```
-
-TODO: Make above chart nicer labels. 
 
 Now we broke bike usage out across the entire year to see if some bikes are being ridden more on a year-long basis. The above histogram shows bike usage the number of rides per bikes. TODO: Interpret histogram
 
@@ -460,11 +464,9 @@ leaflet(bike_return_ever) %>%
     setView(-74, 40.75, zoom = 11.5) %>%
     addMarkers(
         lng = ~longitude, lat = ~latitude,
-        popup = paste(bike_return_ever$bikeid, bike_return_ever$end_station_name, "<br>", bike_return_ever$num_returns)
+        popup = paste("Bike id:", bike_return_ever$bikeid, "<br> Station:", bike_return_ever$end_station_name, "<br>Total Visits:", bike_return_ever$num_returns)
     )
 ```
-
-TODO: Give above map better popups
 
 The above map depicts the stations were bikes most frequently returned to over the entire year.
 
@@ -486,11 +488,9 @@ leaflet(bike_return_day) %>%
     setView(-74, 40.75, zoom = 11.5) %>%
     addMarkers(
         lng = ~longitude, lat = ~latitude,
-        popup = paste(bike_return_day$bikeid, bike_return_day$end_station_name, "<br>", bike_return_day$num_returns)
+        popup = paste("Bike id:", bike_return_day$bikeid, "<br> Station:", bike_return_day$end_station_name, "<br>Daily Visits:", bike_return_day$num_returns)
     )
 ```
-
-TODO: Give above map better popups
 
 The above map depicts the stations were bikes most frequently returned to on any given day.
 
