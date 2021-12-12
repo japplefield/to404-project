@@ -73,12 +73,12 @@ weather$TAVG <- (weather$TMAX + weather$TMIN) / 2
 ```
 
 ```{r weather-merge}
-citi <- inner_join(citi, weather, by = c("day" = "Date"))
-str(citi)
+citimerged <- inner_join(citi, weather, by = c("day" = "Date"))
+str(citimerged)
 ```
 
 ```{r citi-sample}
-citi_sample <- sample_frac(citi, 0.05)
+citi_sample <- sample_frac(citimerged, 0.05)
 ```
 
 Citibike system data was used from [this](https://ride.citibikenyc.com/system-data) data repository. We also used weather data provided from NWS. The full data set with over 20 million rides was used for most visualizations, but a 5% sample was used for examples including regression for the purpose of simplicity.
@@ -88,7 +88,7 @@ Citibike system data was used from [this](https://ride.citibikenyc.com/system-da
 ## Does Temperature Affect the Number of Trips that are Taken?
 ```{r tempgenderchart}
 # Bar Chart of Rides Based on Temperature
-tempgenderchart <- ggplot(citi, aes(x = TAVG, fill = gender)) +
+tempgenderchart <- ggplot(citimerged, aes(x = TAVG, fill = gender)) +
     geom_histogram() +
     xlab("Temperature") +
     ylab("Number of Trips Taken") +
@@ -96,6 +96,10 @@ tempgenderchart <- ggplot(citi, aes(x = TAVG, fill = gender)) +
 ```
 ```{r tempgenderchart-2, cache=FALSE}
 tempgenderchart
+```
+
+```{r rm-tempgenderchart-2, cache=FALSE}
+rm(tempgenderchart)
 ```
 
 As we see here, there is a considerable amount of our consumer base that is male compared to female. That being said, the proportion remains fairly consistent across the different temperatures and should be a point of emphasis in our marketing. However, it should be noted that the number of trips as temperature increases is significant and should be noted for the months in which there are higher/lower temperatures. In terms of a utilization strategy, it makes sense that we should have less bikes on the street during the winter months, one because the data suggests that there is a significant correlation with the number of trips that are taken and the temperature. We suggest a utilization strategy that continues to increase the number of bikes on the street as the year goes on and the temperatures get warmer. It tracks in the other direction as well. As winter comes along, we should begin decreasing the number of bikes on the street.
@@ -113,6 +117,9 @@ animatetempchart
 ```
 This animated chart is meant to inform the management on temperature movements thorughout the year for the purposes of fulfilling the aforementioned plan to have less bikes on the streets when its too hot/too cold, based on the graph that we have depicted first in this section of the Report. If we run a cross section, it would makes sense to have all of our bikes on the road from the months of May through the end of October. In the other months, we can have less bikes on the streets without having to worry about utilization issues, except for those stations that we are going to discuss later in this report.
 
+```{r rm-animatetempchart}
+rm(animatetempchart)
+```
 
 ## What effect does Temperature Have on the Speed of Riders?
 ```{r tempspeedchart}
@@ -129,6 +136,10 @@ tempspeedchart
 
 The main point of analyzing the speed of riders is to know how fast they are getting from point A to point B in order to fulfill our services to other customers that may be waiting for bikes at a specific station and/or lookng for a station with Bikes. The faster riders go, the less time they spend on bikes. That being said, we see here that as temperature increases, there is a negative trend to speed. This means that in the summer months, there are probably more leisure riders tying to see the city rather than get to point B as fast as possible. In addition to this, we ned to consider the relationship in the context of utilization. As stated before, we are looking to have the least amount of wait times for our customers as possible with high, but not overburdened utilization. This means that we should expect there to be higher capacity utilization in the months where it is warmer due to reduced speeds of our riders.
 
+```{r rm-tempspeedchart}
+rm(tempspeedchart)
+```
+
 
 ## What Effect does Temperature Have on the Distance of Trips?
 ```{r tempdistchart}
@@ -144,6 +155,10 @@ tempdistchart
 
 Simply put, this graph shows the relationship between distance traveled and the average temperature on any given day. It has a possitive relationship, meaning that as the days get warmer, we can expect there to be a majority of rides that incrase in distance. Again, it all goes back to utilization, and the longer that riders travel, the longer they are on the bike, all else equal. We expect this to add to our point that utilization will most likely be near, if not at, 100% for a majority of our bike stations during the months where it is warmer.
 
+```{r rm-tempdistchart}
+rm(tempdistchart)
+```
+
 
 ## What Effect Does Precipitation Have on the Speed of Riders?
 ```{r prcpspeedchart}
@@ -157,8 +172,13 @@ prcpspeedchart <- ggplot(citi_sample, aes(x = PRCP, y = speed)) +
 prcpspeedchart
 ```
 
+
 Obviously no one likes to be in the rain. This is why we have plotted the relationship of precipitation and the speed of our riders. On those days where it rains, we see an increase in the speeds at which riders go. Connecting it back to our point on utilization, although there is likely to be lower risk of capacity problems on these days, it may not make sense to decrease the number of bikes on the street because there are always stations that are over utilized in neighborhoods like mahattan compared to others east of the city.
 
+
+```{r}
+rm(prcpspeedchart)
+```
 
 ## What Effect Does Precipitation Have on the Distance of Trips?
 ```{r prcpdistchart}
@@ -175,6 +195,10 @@ prcpdistchart
 It makes sense that riders would travel less distance to stay out of the rain, but the overall trend does not seem to have all that much effect on the actual riders themselves. This means that the majority of our riders have to get to where they need to no matter the weather conditions. From this we can conclude that we are a key transportation resource for those who may not be able to afford other public transportation options and a motor vehicle. We should consider this when pricing our services for the annual subscription.
 
 
+```{r}
+rm(prcpdistchart)
+```
+
 ## Does Snow Impact the Number of Trips Taken?
 
 ```{r tempuserchart}
@@ -188,11 +212,14 @@ tempuserchart
 
 As expected, the *vast* majority of trips are taken when there is little to no snow. Riders simply do not want to ride bikes in the snow. Something interesting to note here is that (at least visually) it seems that rides that are taken when there is snow are taken by subscribers as opposed to customers. This suggests that the subscribers ride more so out of necessity (to get to work, etc.) whereas customers may ride more for leisure.
 
+```{r}
+rm(tempuserchart)
+```
 
 ## Does Wind Impact the Number of Trips Taken?
 
 ```{r snowgenderchart}
-snowgenderchart <- ggplot(citi, aes(x = AWND, fill = gender)) +
+snowgenderchart <- ggplot(citimerged, aes(x = AWND, fill = gender)) +
     geom_histogram() +
     xlab("Wind") +
     ylab("Number of Trips Taken") +
@@ -200,14 +227,22 @@ snowgenderchart <- ggplot(citi, aes(x = AWND, fill = gender)) +
 snowgenderchart
 ```
 
+```{r}
+rm(snowgenderchart)
+```
+
 
 ```{r tempuserchart-2}
-tempuserchart <- ggplot(citi, aes(x = AWND, fill = usertype)) +
+tempuserchart <- ggplot(citimerged, aes(x = AWND, fill = usertype)) +
     geom_histogram() +
     xlab("Wind") +
     ylab("Number of Trips Taken") +
     ggtitle("Histogram of Wind v. # of Trips Grouped by User Type")
 tempuserchart
+```
+
+```{r}
+rm(tempuserchart)
 ```
 
 
@@ -226,6 +261,9 @@ windspeedchart
 
 There is a significantly greater increase in rider speed when there is precipitation as opposed to when there is wind. This could have to do with the fact that both headwind and tailwind can impact rider speed; if there is headwind, bikes will be slowed down, whereas if there is tailwind, bikes will travel faster. The two may essentially cancel each other out. It is important to note that this chart does not study the relationship between precipitation and wind and their combined effects on rider speed, but looking at wind alone, it seems that there is a minimal effect on speed.
 
+```{r}
+rm(windspeedchart)
+```
 
 ## What Effect Does Wind Have on the Distance of Trips?
 
@@ -238,6 +276,10 @@ winddistchart <- ggplot(citi_sample, aes(x = AWND, y = distmeters)) +
     ylab("Distance (Meters)") +
     ggtitle("Relationship b/w Wind and Distance")
 winddistchart
+```
+
+```{r}
+rm(winddistchart)
 ```
 
 Wind seems to have a minimal effect on how far bikers ride compared to the effect that precipitation has. This is interesting: does precipitation have such a substantial psychological impact on riders that it changes the routes they have planned? This certainly depends on the purpose of each ride, be it for work or for leisure. It is important to note that this chart does not study the relationship between precipitation and wind and their combined effects on travel distance, but looking at wind alone, it seems that there is in fact a small effect on distance.
@@ -257,6 +299,15 @@ tempagechart
 ```
 
 Temperature has a significantly larger impact on the expected age of subscribers than customers (almost 33x). For both, there is a negative relationship between temperature and age. Subscribers likely ride more out of necessity, so older people are more likely to continue riding in the cold, explaining the larger y-intercept. Customers are less sensitive to temperature because they ride less in extreme temperatures to begin with. As temperature rises, age decreases. Younger people are more likely to ride when it’s warmer and older customers are more likely to ride when it’s colder.
+
+```{r}
+rm(tempagechart)
+```
+
+```{r delete-merge, include=FALSE}
+rm(citimerged, weather, citi_sample)
+gc()
+```
 
 # Rides
 
@@ -345,6 +396,10 @@ baseplot1 <- ggplot(data = Gender_Trips, aes(x = month, y = Avg_Speed, color = g
     xlim(1, 12)
 gender_plot <- baseplot1 + geom_line() + scale_x_continuous(breaks = scales::pretty_breaks(n = 12))
 gender_plot
+```
+
+```{r delete-rides}
+rm(Departing_Stations, Arriving_Stations, Routes, Age_Speed, Gender_Trips)
 ```
 
 
@@ -495,9 +550,17 @@ leaflet(bike_return_day) %>%
 The above map depicts the stations were bikes most frequently returned to on any given day.
 
 
+
+```{r delete-usage}
+rm(daily_usage, avg_bike_usage, monthly_usage, bike_usage, station_info, bike_return_ever, bike_return_day)
+gc()
+```
+
 ## How do the most used bikes move on their active days?
 
 We wanted to find out how the most active bikes are moving around: are they mostly staying in the same areas and being ridden back and forth, or are they traversing long distancess.
+
+
 
 ```{r bike_daily_usage}
 bike_daily_usage <- citi %>%
@@ -534,6 +597,11 @@ leaflet(bike_daily_usage) %>%
 ```
 
 The above map depicts the journeys of the most frequently ridden bikes on any given day. As we can see, bikes tend to traverse very long distances when they are being ridden frequently, and not ending up close to where they started.
+
+```{r delete-usage-2}
+rm(bike_daily_usage, active_firsts, active_lasts)
+gc()
+```
 
 # Asymmetric Traffic
 
