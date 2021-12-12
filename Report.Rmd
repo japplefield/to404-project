@@ -626,7 +626,7 @@ num_stations_by_neighborhood <- leaflet(map_data) %>%
     ) %>%
     addCircleMarkers(nyc$lng, nyc$lat,
         popup = paste(nyc$station, "<br>", nyc$departure_count, "Departures"), data = nyc,
-        color = "gray", radius = nyc$departure_count / 100
+        color = "gray", radius = nyc$departure_count / 10000
     ) %>%
     addLegend(pal = pal, values = ~num_stations, title = "Number of Stations") %>%
     addProviderTiles("CartoDB.Positron") %>%
@@ -656,7 +656,7 @@ bike_deficit_map <- leaflet(bike_deficit) %>%
             bike_deficit$station, "<br>", ifelse(bike_deficit$deficit >= 0, "Bike deficit = ", "Bike surplus = "),
             abs(bike_deficit$deficit)
         ),
-        radius = abs(bike_deficit$deficit) / 5, color = ifelse(bike_deficit$deficit > 0, "red", "green")
+        radius = abs(bike_deficit$deficit) / 5000, color = ifelse(bike_deficit$deficit > 0, "red", "green")
     )
 
 bike_deficit_map
@@ -729,7 +729,7 @@ bike_deficit_num_stations_map <- leaflet(map_data) %>%
             bike_deficit_worststations$station, "<br>", ifelse(bike_deficit_worststations$deficit >= 0, "Bike deficit = ", "Bike surplus = "),
             abs(bike_deficit_worststations$deficit)
         ),
-        radius = abs(bike_deficit_worststations$deficit) / 5, color = ifelse(bike_deficit_worststations$deficit > 0, "red", "green")
+        radius = abs(bike_deficit_worststations$deficit) / 5000, color = ifelse(bike_deficit_worststations$deficit > 0, "red", "green")
     ) %>%
     addLegend(pal = pal, values = ~num_stations, title = "Number of Stations") %>%
     addProviderTiles("CartoDB.Positron") %>%
@@ -766,7 +766,7 @@ leaflet(map_data) %>%
             bike_deficit_table_merged$station, "<br>", ifelse(bike_deficit_table_merged$deficit >= 0, "Bike deficit = ", "Bike surplus = "),
             abs(bike_deficit_table_merged$deficit)
         ),
-        radius = abs(bike_deficit_table_merged$deficit) / 5, color = ifelse(bike_deficit_table_merged$deficit > 0, "red", "green")
+        radius = abs(bike_deficit_table_merged$deficit) / 5000, color = ifelse(bike_deficit_table_merged$deficit > 0, "red", "green")
     ) %>%
     addLegend(pal = pal, values = ~num_stations, title = "Number of Stations") %>%
     addProviderTiles("CartoDB.Positron") %>%
