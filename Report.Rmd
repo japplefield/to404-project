@@ -1,7 +1,7 @@
 ---
 title: "Final Report"
 author: "Group 7"
-date: "12/12/2021"
+Date: "12/12/2021"
 output:
   html_document:
     code_folding: hide
@@ -13,21 +13,339 @@ output:
     number_sections: true
 ---
 
-# What Does the Data Look Like?
-```{r}
-#Reading the Libraries
-library(ggpubr)
-library(ggplot2)
-library(dplyr)
-library(gganimate)
-library(tidyr)
-library(stringr)
-library(geosphere)
-library(leaflet)
-library(janitor)
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+```
 
-#Importing the data
-citi <- read.csv("citicleaned.csv")
+# Intro
+
+# Setup
+
+## Load Libraries
+```{r}
+library(broom)
+library(geosphere)
+library(gganimate)
+library(ggcats)
+library(ggmap)
+library(ggpubr)
+library(httr)
+library(janitor)
+library(leaflet)
+library(leaflet.minicharts)
+library(lubridate)
+library(maptools)
+library(rgdal)
+library(rmarkdown)
+library(sp)
+library(tidyverse)
+library(tigris)
+```
+
+## Load Data
+
+```{r}
+citi <- read_csv("citicleaned.csv")
+citi <- citi[, -1]
+# citi <- read_csv("citiall.csv")
+# citi <- clean_names(citi)
+
+citi$start_station_name <- as.factor(citi$start_station_name)
+citi$start_station_id <- as.factor(citi$start_station_id)
+citi$end_station_name <- as.factor(citi$end_station_name)
+citi$end_station_id <- as.factor(citi$end_station_id)
+citi$usertype <- as.factor(citi$usertype)
+citi$gender <- as.factor(citi$gender)
+citi$dayid <- as.factor(citi$dayid)
+
+# str(citi)
+
+weather <- read_csv("NYCWeather2019.csv")
+weather$STATION <- NULL
+weather$NAME <- NULL
+weather$Date <- as.Date(weather$DATE, format = "%m/%d/%Y")
+weather$DATE <- NULL
+weather$TAVG <- (weather$TMAX + weather$TMIN) / 2
+
+# str(weather)
+
+citimerged <- merge(citi, weather, by = "Date")
+str(citimerged)
+View(citimerged)
+```
+
+# Does Temperature Affect the Number of Trips that are Taken?
+```{r}
+# Bar Chart of Rides Based on Temperature
+tempgenderchart <- ggplot(citimerged, aes(x = TAVG, fill = gender)) +
+    geom_histogram() +
+    xlab("Temperature") +
+    ylab("Number of Trips Taken") +
+    ggtitle("Histogram of Temp v. # of Trips Grouped by Gender")
+tempgenderchart
+```
+
+As we see here, there is a considerable amount of our consumer base that is male compared to female. That being said, the proportion remains fairly consistent across the different temperatures and should be a point of emphasis in our marketing. However, it should be noted that the number of trips as temperature increases is significant and should be noted for the months in which there are higher/lower temperatures. In terms of a utilization strategy, it makes sense that we should have less bikes on the street during the winter months, one because the data suggests that there is a significant correlation with the number of trips that are taken and the temperature. We suggest a utilization strategy that continues to increase the number of bikes on the street as the year goes on and the temperatures get warmer. It tracks in the other direction as well. As winter comes along, we should begin decreasing the number of bikes on the street.
+
+# How Does Temperature Change Across the Months?
+```{r}
+animatetempchart <- ggplot(citimerged, aes(Date, TAVG, group = month, colour = factor(month))) +
+    geom_line() +
+    xlab("Date") +
+    ylab("Temperature") +
+    ggtitle("Change in Temperature Over Time") +
+    transition_reveal(Date)
+animatetempchart
+```
+
+This animated chart is meant to inform the management on temperature movements thorughout the year for the purposes of fulfilling the aforementioned plan to have less bikes on the streets when its too hot/too cold, based on the graph that we have depicted first in this section of the Report. If we run a cross section, it would makes sense to have all of our bikes on the road from the months of May through the end of October. In the other months, we can have less bikes on the streets without having to worry about utilization issues, except for those stations that we are going to discuss later in this report.
+
+# What effect does Temperature Have on the Speed of Riders?
+```{r}
+tempspeedchart <- ggplot(citimerged, aes(x = TAVG, y = speed)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = lm) +
+    stat_regline_equation() +
+    xlab("Average Temperature") +
+    ylab("Speed") +
+    ggtitle("The Relationship  b/w Speed and Temp")
+tempspeedchart
+```
+
+The main point of analyzing the speed of riders is to know how fast they are getting from point A to point B in order to fulfill our services to other customers that may be waiting for bikes at a specific station and/or lookng for a station with Bikes. The faster riders go, the less time they spend on bikes. That being said, we see here that as temperature increases, there is a negative trend to speed. This means that in the summer months, there are probably more leisure riders tying to see the city rather than get to point B as fast as possible. In addition to this, we ned to consider the relationship in the context of utilization. As stated before, we are looking to have the least amount of wait times for our customers as possible with high, but not overburdened utilization. This means that we should expect there to be higher capacity utilization in the months where it is warmer due to reduced speeds of our riders.
+
+# What Effect does Temperature Have on the Distance of Trips?
+```{r}
+tempdistchart <- ggplot(citimerged, aes(x = TAVG, y = distmeters)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = lm) +
+    stat_regline_equation() +
+    xlab("Average Temperature") +
+    ylab("Distance (Meters)") +
+    ggtitle("Relationship b/w Distance and Temp")
+tempdistchart
+```
+
+Simply put, this graph shows the relationship between distance traveled and the average temperature on any given day. It has a possitive relationship, meaning that as the days get warmer, we can expect there to be a majority of rides that incrase in distance. Again, it all goes back to utilization, and the longer that riders travel, the longer they are on the bike, all else equal. We expect this to add to our point that utilization will most likely be near, if not at, 100% for a majority of our bike stations during the months where it is warmer.
+
+# What Effect Does Precipitation Have on the Speed of Riders?
+```{r}
+prcpspeedchart <- ggplot(citimerged, aes(x = PRCP, y = speed)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = lm) +
+    stat_regline_equation() +
+    xlab("Precipitation") +
+    ylab("Speed") +
+    ggtitle("Relationship b/w Precipitation and Speed")
+prcpspeedchart
+```
+
+Obviously no one likes to be in the rain. This is why we have plotted the relationship of precipitation and the speed of our riders. On those days where it rains, we see an increase in the speeds at which riders go. Connecting it back to our point on utilization, although there is likely to be lower risk of capacity problems on these days, it may not make sense to decrease the number of bikes on the street because there are always stations that are over utilized in neighborhoods like mahattan compared to others east of the city.
+
+# What Effect Does Precipitation Have on the Distance of Trips?
+```{r}
+prcpdistchart <- ggplot(citimerged, aes(x = PRCP, y = distmeters)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = lm) +
+    stat_regline_equation() +
+    xlab("Precipitation") +
+    ylab("Distance (Meters)") +
+    ggtitle("Relationship b/w Precipitation and Distance")
+prcpdistchart
+```
+
+It makes sense that riders would travel less distance to stay out of the rain, but the overall trend does not seem to have all that much effect on the actual riders themselves. This means that the majority of our riders have to get to where they need to no matter the weather conditions. From this we can conclude that we are a key transportation resource for those who may not be able to afford other public transportation options and a motor vehicle. We should consider this when pricing our services for the annual subscription.
+
+# Does Snow Impact the Number of Trips Taken?
+
+```{r}
+tempuserchart <- ggplot(citimerged, aes(x = SNOW, fill = usertype)) +
+    geom_histogram() +
+    xlab("Snow") +
+    ylab("Number of Trips Taken") +
+    ggtitle("Histogram of Snow v. # of Trips Grouped by User Type")
+tempuserchart
+```
+
+As expected, the *vast* majority of trips are taken when there is little to no snow. Riders simply do not want to ride bikes in the snow. Something interesting to note here is that (at least visually) it seems that rides that are taken when there is snow are taken by subscribers as opposed to customers. This suggests that the subscribers ride more so out of necessity (to get to work, etc.) whereas customers may ride more for leisure.
+
+# Does Wind Impact the Number of Trips Taken?
+
+```{r}
+snowgenderchart <- ggplot(citimerged, aes(x = AWND, fill = gender)) +
+    geom_histogram() +
+    xlab("Wind") +
+    ylab("Number of Trips Taken") +
+    ggtitle("Histogram of Wind v. # of Trips Grouped by Gender")
+snowgenderchart
+```
+
+```{r}
+tempuserchart <- ggplot(citimerged, aes(x = AWND, fill = usertype)) +
+    geom_histogram() +
+    xlab("Wind") +
+    ylab("Number of Trips Taken") +
+    ggtitle("Histogram of Wind v. # of Trips Grouped by User Type")
+tempuserchart
+```
+
+# What Effect Does Wind Have on the Speed of Riders?
+
+```{r}
+windspeedchart <- ggplot(citimerged, aes(x = AWND, y = speed)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = lm) +
+    stat_regline_equation() +
+    xlab("Wind") +
+    ylab("Speed") +
+    ggtitle("Relationship b/w Wind and Speed")
+windspeedchart
+```
+
+There is a significantly greater increase in rider speed when there is precipitation as opposed to when there is wind. This could have to do with the fact that both headwind and tailwind can impact rider speed; if there is headwind, bikes will be slowed down, whereas if there is tailwind, bikes will travel faster. The two may essentially cancel each other out. It is important to note that this chart does not study the relationship between precipitation and wind and their combined effects on rider speed, but looking at wind alone, it seems that there is a minimal effect on speed.
+
+# What Effect Does Wind Have on the Distance of Trips?
+
+```{r}
+winddistchart <- ggplot(citimerged, aes(x = AWND, y = distmeters)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = lm) +
+    stat_regline_equation() +
+    xlab("Wind") +
+    ylab("Distance (Meters)") +
+    ggtitle("Relationship b/w Wind and Distance")
+winddistchart
+```
+
+Wind seems to have a minimal effect on how far bikers ride compared to the effect that precipitation has. This is interesting: does precipitation have such a substantial psychological impact on riders that it changes the routes they have planned? This certainly depends on the purpose of each ride, be it for work or for leisure. It is important to note that this chart does not study the relationship between precipitation and wind and their combined effects on travel distance, but looking at wind alone, it seems that there is in fact a small effect on distance.
+
+# Does Temperature Impact the Age of Riders?
+
+```{r}
+tempagechart <- ggplot(citimerged, aes(x = TAVG, y = age, color = usertype)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = lm) +
+    stat_regline_equation() +
+    xlab("Temperature") +
+    ylab("Age") +
+    ggtitle("Relationship b/w Temperature and Age Grouped by User Type")
+tempagechart
+```
+
+```{r, cache=FALSE}
+# Loading the Libraries
+```
+
+```{r}
+# Observing the Data
+# citi <- read.csv("citicleaned.csv")
+citi <- read_csv("citiall.csv")
+str(citi)
+```
+
+## Ride Pattern Analysis 
+
+### What are the Most Popular Stations? 
+```{r}
+# Departing Station Dataset (Only shows top 10 locations)
+Departing_Stations <- group_by(citi, start_station_name, start_station_latitude, start_station_longitude)
+Departing_Stations <- arrange(summarize(Departing_Stations, Trips = n()), desc(Trips))[1:10, ]
+
+# Arriving Station Dataset (only shows top 10 locations)
+Arriving_Stations <- group_by(citi, end_station_name, end_station_latitude, end_station_longitude)
+Arriving_Stations <- arrange(summarize(Arriving_Stations, Trips = n()), desc(Trips))[1:10, ]
+
+# Creating Map Based Visualizations (Won't let me add color argument for some reason)
+Stations_Map <- leaflet() %>%
+    addTiles() %>%
+    addMarkers(lat = Departing_Stations$start_station_latitude, lng = Departing_Stations$start_station_longitude, popup = paste(Departing_Stations$start_station_name, "<br>", Departing_Stations$Trips), clusterOptions = markerClusterOptions()) %>%
+    addCircleMarkers(lat = Arriving_Stations$end_station_latitude, lng = Arriving_Stations$end_station_longitude, popup = paste(Arriving_Stations$end_station_name, "<br>", Arriving_Stations$Trips), clusterOptions = markerClusterOptions())
+
+Stations_Map
+```
+
+The most popular stations for both departing (represented by markers) and arriving (represented by circles) are scattered throughout New York City. One particularly interesting finding is that many of the most popular stations to leave from are also the most popular stations to arrive to, which helps regulate the flow of bikes around New York city 
+
+### What are the Most Popular Routes? 
+```{r}
+# Creating the dataset
+citi$routes <- paste(citi$start_station_name, citi$end_station_name, sep = " -> ")
+
+# Finding the Most Popular Routes (only shows top 10!)
+Routes <- group_by(citi, routes)
+Routes <- arrange(summarize(Routes, Trips = n(), PercentofTotal = round(n() / nrow(citi) * 100, digits = 3)), desc(Trips))
+head(Routes, n = 10)
+```
+
+Of the `r nrow(citi)` trips sampled, there were `r nrow(Routes)`  unique routes, suggesting that no one route is extremely popular amongst New Yorkers and that evaluating individual routes over time would not be statistically significant. In fact, the top 10 most popular routes combined represent less than 0.4% of total trips. Funny enough, 3 of the 10 most popular routes (#2, #5 and #10) involve both picking up and dropping off your bike at the exact same location! 
+
+### Does Age Affect the Speed of Riders? 
+
+```{r}
+# Converting Meters per Second to Miles per Hour
+citi$speed_MPH <- citi$speed * 3600 / 1000 * 0.6
+
+# Creating New Age Column
+citi$age <- 2021 - citi$birth_year
+
+# Sorting by Age and Graphing
+Age_Speed <- citi %>%
+    group_by(age) %>%
+    summarize(Avg_Speed = mean(speed_MPH, na.rm = TRUE))
+
+baseplot <- ggplot(data = Age_Speed, aes(x = age, y = Avg_Speed)) +
+    labs(x = "Age (Years)", y = "Average Speed (MPH)") +
+    xlim(18, 80) +
+    ylim(3, 5)
+realplot <- baseplot + geom_point(color = "blue")
+realplot
+```
+
+A person's age appears to have a significant impact on the speed at which they ride. From ages 18 to 30, there is a sharp increase in average speed, going from 3 to 4.5 miles per hour. However, the average speed of riders starts to gradually decline around age 35, with that rate of decline increasing with age, especially in senior citizens (65-80 year old individuals). Oddly enough, individuals in their late 70s appear to ride at nearly the same speed as people in their early 20s!  
+
+### Do Trip Durations Differ By Month Across Genders? 
+```{r}
+# Creating the Summarized Dataset for Men and Women
+Gender_Trips <- filter(citi, gender != "unknown") %>%
+    group_by(month, gender) %>%
+    summarize(Avg_Duration = mean(tripduration, na.rm = TRUE), Avg_Speed = mean(speed_MPH, na.rm = TRUE))
+
+# Graphing the Result
+baseplot1 <- ggplot(data = Gender_Trips, aes(x = month, y = Avg_Duration, color = gender)) +
+    labs(x = "Month (1 = September, 12 = December)", y = "Average Trip Duration (Seconds)") +
+    xlim(1, 12)
+gender_plot <- baseplot1 + geom_line() + scale_x_continuous(breaks = scales::pretty_breaks(n = 12))
+
+gender_plot
+```
+<br>
+<br>
+
+On average, men appear to take shorter bicycle trips than women, though women took slightly shorter trips than men in April and November. This is likely due to men outpacing women during their bike trips, as is shown on the additional graph below. That said, both genders tend to take their longest trips during the summer months (6 to 9) and their shortest trips during the winter (12 & 1 to 2), suggesting that the weather plays a toll on the length of bike rides 
+
+```{r}
+# Graphing the Result
+baseplot1 <- ggplot(data = Gender_Trips, aes(x = month, y = Avg_Speed, color = gender)) +
+    labs(x = "Month (1 = September, 12 = December)", y = "Average Speed (MPH)") +
+    xlim(1, 12)
+gender_plot <- baseplot1 + geom_line() + scale_x_continuous(breaks = scales::pretty_breaks(n = 12))
+gender_plot
+```
+
+
+```{r, cache=FALSE}
+# Loading the Libraries
+
+```
+
+#Citibike Team # Group Project  
+```{r}
+# Observing the Data
+citi <- read_csv("citicleaned.csv")
+# citi <- read_csv("citiall.csv")
+
 citi <- clean_names(citi)
 
 citi$start_station_name <- as.factor(citi$start_station_name)
@@ -37,116 +355,560 @@ citi$end_station_id <- as.factor(citi$end_station_id)
 citi$usertype <- as.factor(citi$usertype)
 citi$gender <- as.factor(citi$gender)
 citi$dayid <- as.factor(citi$dayid)
-citi$DATE <- as.Date(citi$starttime, format = "%Y-%m-%d")
 
-#str(citi)
 
-weather <- read.csv("NYCWeather2019.csv")
-weather$STATION <- NULL
-weather$NAME <- NULL
-weather$DATE <- as.Date(weather$DATE, format= "%m/%d/%Y")
-weather$TAVG <- (weather$TMAX + weather$TMIN)/2
-
-#str(weather)
-
-citimerged <- merge(citi,weather, by = "DATE")
-str(citimerged)
-View(citimerged)
-
+str(citi)
 ```
 
-# Does Temperature Affect the Number of Trips that are Taken?
+## Bike Usage Analysis 
+
+I'm seeking to answer the following questions:
+
+### How does bike usage change over time?
+
+#### Number of Rides per Day per bike
 ```{r}
-#Bar Chart of Rides Based on Temperature
-tempgenderchart <- ggplot(citimerged, aes(x = TAVG, fill = gender)) + geom_histogram() + xlab("Temperature") + ylab("Number of Trips Taken") + ggtitle("Histogram of Temp v. # of Trips Grouped by Gender")
-tempgenderchart
-```
-
-As we see here, there is a considerable amount of our consumer base that is male compared to female. That being said, the proportion remains fairly consistent across the different temperatures and should be a point of emphasis in our marketing. However, it should be noted that the number of trips as temperature increases is significant and should be noted for the months in which there are higher/lower temperatures. In terms of a utilization strategy, it makes sense that we should have less bikes on the street during the winter months, one because the data suggests that there is a significant correlation with the number of trips that are taken and the temperature. We suggest a utilization strategy that continues to increase the number of bikes on the street as the year goes on and the temperatures get warmer. It tracks in the other direction as well. As winter comes along, we should begin decreasing the number of bikes on the street.
-
-# How Does Temperature Change Across the Months?
-```{r}
-animatetempchart <- ggplot(citimerged, aes(DATE, TAVG, group = month, colour = factor(month))) + geom_line() + xlab("Date") + ylab("Temperature") + ggtitle("Change in Temperature Over Time") + transition_reveal(DATE)
-animatetempchart
-```
-
-This animated chart is meant to inform the management on temperature movements thorughout the year for the purposes of fulfilling the aforementioned plan to have less bikes on the streets when its too hot/too cold, based on the graph that we have depicted first in this section of the Report. If we run a cross section, it would makes sense to have all of our bikes on the road from the months of May through the end of October. In the other months, we can have less bikes on the streets without having to worry about utilization issues, except for those stations that we are going to discuss later in this report.
-
-# What effect does Temperature Have on the Speed of Riders?
-```{r}
-tempspeedchart <- ggplot(citimerged, aes(x = TAVG, y = speed)) + geom_point(alpha = 0.2) + geom_smooth(method = lm) + stat_regline_equation() + xlab("Average Temperature") + ylab("Speed") + ggtitle("The Relationship  b/w Speed and Temp")
-tempspeedchart
-```
-
-The main point of analyzing the speed of riders is to know how fast they are getting from point A to point B in order to fulfill our services to other customers that may be waiting for bikes at a specific station and/or lookng for a station with Bikes. The faster riders go, the less time they spend on bikes. That being said, we see here that as temperature increases, there is a negative trend to speed. This means that in the summer months, there are probably more leisure riders tying to see the city rather than get to point B as fast as possible. In addition to this, we ned to consider the relationship in the context of utilization. As stated before, we are looking to have the least amount of wait times for our customers as possible with high, but not overburdened utilization. This means that we should expect there to be higher capacity utilization in the months where it is warmer due to reduced speeds of our riders.
-
-# What Effect does Temperature Have on the Distance of Trips?
-```{r}
-tempdistchart <- ggplot(citimerged, aes(x = TAVG, y = distmeters)) + geom_point(alpha = 0.2) + geom_smooth(method = lm) + stat_regline_equation() + xlab("Average Temperature") + ylab("Distance (Meters)") + ggtitle("Relationship b/w Distance and Temp")
-tempdistchart
-```
-
-Simply put, this graph shows the relationship between distance traveled and the average temperature on any given day. It has a possitive relationship, meaning that as the days get warmer, we can expect there to be a majority of rides that incrase in distance. Again, it all goes back to utilization, and the longer that riders travel, the longer they are on the bike, all else equal. We expect this to add to our point that utilization will most likely be near, if not at, 100% for a majority of our bike stations during the months where it is warmer.
-
-# What Effect Does Precipitation Have on the Speed of Riders?
-```{r}
-prcpspeedchart <- ggplot(citimerged, aes(x = PRCP, y = speed)) + geom_point(alpha = 0.2) + geom_smooth(method = lm) + stat_regline_equation() + xlab("Precipitation") + ylab("Speed") + ggtitle("Relationship b/w Precipitation and Speed")
-prcpspeedchart
-```
-
-Obviously no one likes to be in the rain. This is why we have plotted the relationship of precipitation and the speed of our riders. On those days where it rains, we see an increase in the speeds at which riders go. Connecting it back to our point on utilization, although there is likely to be lower risk of capacity problems on these days, it may not make sense to decrease the number of bikes on the street because there are always stations that are over utilized in neighborhoods like mahattan compared to others east of the city.
-
-# What Effect Does Precipitation Have on the Distance of Trips?
-```{r}
-prcpdistchart <- ggplot(citimerged, aes(x = PRCP, y = distmeters)) + geom_point(alpha = 0.2) + geom_smooth(method = lm) + stat_regline_equation() + xlab("Precipitation") + ylab("Distance (Meters)") + ggtitle("Relationship b/w Precipitation and Distance")
-prcpdistchart
-```
-
-It makes sense that riders would travel less distance to stay out of the rain, but the overall trend does not seem to have all that much effect on the actual riders themselves. This means that the majority of our riders have to get to where they need to no matter the weather conditions. From this we can conclude that we are a key transportation resource for those who may not be able to afford other public transportation options and a motor vehicle. We should consider this when pricing our services for the annual subscription.
-
-# Does Snow Impact the Number of Trips Taken?
-
-```{r}
-tempuserchart <- ggplot(citimerged, aes(x = SNOW, fill = usertype)) + geom_histogram() + xlab("Snow") + ylab("Number of Trips Taken") + ggtitle("Histogram of Snow v. # of Trips Grouped by User Type")
-tempuserchart
-```
-
-As expected, the *vast* majority of trips are taken when there is little to no snow. Riders simply do not want to ride bikes in the snow. Something interesting to note here is that (at least visually) it seems that rides that are taken when there is snow are taken by subscribers as opposed to customers. This suggests that the subscribers ride more so out of necessity (to get to work, etc.) whereas customers may ride more for leisure.
-
-# Does Wind Impact the Number of Trips Taken?
-
-```{r}
-snowgenderchart <- ggplot(citimerged, aes(x = AWND, fill = gender)) + geom_histogram() + xlab("Wind") + ylab("Number of Trips Taken") + ggtitle("Histogram of Wind v. # of Trips Grouped by Gender")
-snowgenderchart
+daily_usage <- citi %>%
+    group_by(dayid, day, bikeid) %>%
+    summarize(num_rides = n())
 ```
 
 ```{r}
-tempuserchart <- ggplot(citimerged, aes(x = AWND, fill = usertype)) + geom_histogram() + xlab("Wind") + ylab("Number of Trips Taken") + ggtitle("Histogram of Wind v. # of Trips Grouped by User Type")
-tempuserchart
+daily_usage %>%
+    ggplot(aes(x = num_rides)) +
+    geom_histogram()
+
+daily_usage %>%
+    filter(num_rides > 2) %>%
+    nrow()
+
+daily_usage %>%
+    filter(num_rides > 3) %>%
+    nrow()
 ```
 
-# What Effect Does Wind Have on the Speed of Riders?
+
+#### Average number of rides per given bike
+```{r}
+avg_bike_usage <- daily_usage %>%
+    group_by(bikeid) %>%
+    summarize(avg_num_rides = mean(num_rides)) %>%
+    arrange(desc(avg_num_rides))
+```
 
 ```{r}
-windspeedchart <- ggplot(citimerged, aes(x = AWND, y = speed)) + geom_point(alpha = 0.2) + geom_smooth(method = lm) + stat_regline_equation() + xlab("Wind") + ylab("Speed") + ggtitle("Relationship b/w Wind and Speed")
-windspeedchart
+avg_bike_usage %>%
+    ggplot(aes(x = avg_num_rides)) +
+    geom_histogram()
 ```
 
-There is a significantly greater increase in rider speed when there is precipitation as opposed to when there is wind. This could have to do with the fact that both headwind and tailwind can impact rider speed; if there is headwind, bikes will be slowed down, whereas if there is tailwind, bikes will travel faster. The two may essentially cancel each other out. It is important to note that this chart does not study the relationship between precipitation and wind and their combined effects on rider speed, but looking at wind alone, it seems that there is a minimal effect on speed.
 
-# What Effect Does Wind Have on the Distance of Trips?
+### How does bike usage change month to month?
+
+#### Number of Rides per bike per Month
+```{r}
+monthly_usage <- citi %>%
+    group_by(month, bikeid) %>%
+    summarize(num_rides = n())
+```
 
 ```{r}
-winddistchart <- ggplot(citimerged, aes(x = AWND, y = distmeters)) + geom_point(alpha = 0.2) + geom_smooth(method = lm) + stat_regline_equation() + xlab("Wind") + ylab("Distance (Meters)") + ggtitle("Relationship b/w Wind and Distance")
-winddistchart
+monthly_usage %>%
+    ggplot(aes(x = num_rides)) +
+    geom_histogram() +
+    facet_wrap(~month)
 ```
 
-Wind seems to have a minimal effect on how far bikers ride compared to the effect that precipitation has. This is interesting: does precipitation have such a substantial psychological impact on riders that it changes the routes they have planned? This certainly depends on the purpose of each ride, be it for work or for leisure. It is important to note that this chart does not study the relationship between precipitation and wind and their combined effects on travel distance, but looking at wind alone, it seems that there is in fact a small effect on distance.
 
-# Does Temperature Impact the Age of Riders?
+### How does bike usage change between weekdays and weekends?
+
+#### At all?
+```{r}
+weekday_vs_weekend <- daily_usage %>%
+    group_by(dayid, bikeid) %>%
+    summarize(avg_rides = mean(num_rides)) %>%
+    ungroup()
+
+# weekday_usage <- weekday_vs_weekend %>%
+#   filter(dayid == "Weekday") %>%
+#   select(bikeid, avg_rides) %>%
+#   rename(avg_weekday_rides = avg_rides)
+#
+# weekend_usage <- weekday_vs_weekend %>%
+#   filter(dayid == "Weekend") %>%
+#   select(bikeid, avg_rides) %>%
+#   rename(avg_weekend_rides = avg_rides)
+#
+# weekday_vs_weekend <- weekday_usage %>%
+#   full_join(weekend_usage) %>%
+#   mutate_all(~ replace(., is.na(.), 0))
+```
 
 ```{r}
-tempagechart <- ggplot(citimerged, aes(x = TAVG, y = age, color = usertype)) + geom_point(alpha = 0.2) + geom_smooth(method = lm) + stat_regline_equation() + xlab("Temperature") + ylab("Age") + ggtitle("Relationship b/w Temperature and Age Grouped by User Type")
-tempagechart
+
 ```
+
+#### Month to month?
+```{r}
+daily_usage_by_month <- citi %>%
+    group_by(dayid, month, day, bikeid) %>%
+    summarize(num_rides = n())
+
+weekday_vs_weekend_by_month <- daily_usage_by_month %>%
+    group_by(dayid, month, bikeid) %>%
+    summarize(avg_rides = mean(num_rides)) %>%
+    ungroup()
+
+# weekday_usage_by_month <- weekday_vs_weekend_by_month %>%
+#   filter(dayid == "Weekday") %>%
+#   select(bikeid, avg_rides, month) %>%
+#   rename(avg_weekday_rides = avg_rides)
+#
+# weekend_usage_by_month <- weekday_vs_weekend_by_month %>%
+#   filter(dayid == "Weekend") %>%
+#   select(bikeid, avg_rides, month) %>%
+#   rename(avg_weekend_rides = avg_rides)
+#
+# weekday_vs_weekend_by_month <- weekday_usage_by_month %>%
+#   full_join(weekend_usage_by_month) %>%
+#   mutate_all(~ replace(., is.na(.), 0))
+```
+
+### What bikes are used the most?
+
+#### Number of Rides per Bike
+```{r}
+bike_usage <- citi %>%
+    group_by(bikeid) %>%
+    summarize(num_rides = n()) %>%
+    arrange(desc(num_rides))
+```
+
+```{r}
+bike_usage %>%
+    ggplot(aes(x = num_rides)) +
+    geom_histogram()
+```
+
+
+### Do certain bikes make it back to the same stations?
+
+```{r}
+station_info <- citi %>%
+    group_by(end_station_id) %>%
+    arrange(end_station_id) %>%
+    filter(row_number() == 1) %>%
+    ungroup() %>%
+    distinct(end_station_id, end_station_name, latitude = end_station_latitude, longitude = end_station_longitude)
+```
+
+#### Ever?
+```{r}
+bike_return_ever <- citi %>%
+    group_by(end_station_id, bikeid) %>%
+    summarize(num_returns = n()) %>%
+    arrange(desc(num_returns)) %>%
+    left_join(station_info) %>%
+    head(n = 20)
+```
+
+```{r}
+leaflet(bike_return_ever) %>%
+    addTiles() %>%
+    setView(-74, 40.75, zoom = 11.5) %>%
+    addMarkers(
+        lng = ~longitude, lat = ~latitude,
+        popup = paste(bike_return_ever$bikeid, bike_return_ever$end_station_name, "<br>", bike_return_ever$num_returns)
+    )
+```
+
+
+#### On the same day?
+```{r}
+bike_return_day <- citi %>%
+    group_by(day, end_station_id, bikeid) %>%
+    summarize(num_returns = n()) %>%
+    arrange(desc(num_returns)) %>%
+    left_join(station_info) %>%
+    head(n = 20)
+```
+
+```{r}
+leaflet(bike_return_day) %>%
+    addTiles() %>%
+    setView(-74, 40.75, zoom = 11.5) %>%
+    addMarkers(
+        lng = ~longitude, lat = ~latitude,
+        popup = paste(bike_return_day$bikeid, bike_return_day$end_station_name, "<br>", bike_return_day$num_returns)
+    )
+```
+
+
+### How do the most used bikes move on their active days?
+```{r}
+bike_daily_usage <- citi %>%
+    arrange(starttime) %>%
+    group_by(day, bikeid) %>%
+    mutate(num_rides = n(), first_ride = row_number() == 1, last_ride = row_number() == n()) %>%
+    arrange(desc(num_rides)) %>%
+    filter(first_ride | last_ride) %>%
+    head(n = 20)
+
+active_firsts <- bike_daily_usage %>%
+    filter(first_ride) %>%
+    select(bikeid, day, start_station_id, start_station_latitude, start_station_longitude, start_station_name)
+
+active_lasts <- bike_daily_usage %>%
+    filter(last_ride) %>%
+    select(bikeid, day, end_station_id, end_station_latitude, end_station_longitude, end_station_name)
+
+bike_daily_usage <- active_firsts %>%
+    full_join(active_lasts)
+```
+
+```{r}
+leaflet(bike_daily_usage) %>%
+    addTiles() %>%
+    setView(-74, 40.75, zoom = 11.5) %>%
+    addFlows(
+        lng0 = bike_daily_usage$start_station_longitude,
+        lng1 = bike_daily_usage$end_station_longitude,
+        lat0 = bike_daily_usage$start_station_latitude,
+        lat1 = bike_daily_usage$end_station_latitude,
+        maxThickness = 3
+    )
+```
+
+
+
+
+
+```{r, cache =FALSE}
+
+
+```
+
+
+```{r, cache = TRUE}
+# Structure of the data
+citi <- read.csv("citicleaned.csv")
+
+# Additional cleaning
+citi$start_station_name <- as.factor(citi$start_station_name)
+citi$end_station_name <- as.factor(citi$end_station_name)
+
+
+```
+
+```{r, cache = TRUE}
+
+
+# Stations with the highest number of departures
+departures <- citi %>%
+    group_by(station = `start_station_name`, latitude = `start_station_latitude`, longitude = `start_station_longitude`) %>%
+    summarise(departure_count = n())
+
+# Sorting by top departures
+top_departures_sort <- head(departures[order(departures$departure_count, decreasing = TRUE), ], n = 10)
+
+# Stations with the highest number of arrivals
+arrivals <- citi %>%
+    group_by(station = `end_station_name`, latitude = `end_station_latitude`, longitude = `end_station_longitude`) %>%
+    summarise(arrival_count = n())
+# Sorting by top arrivals
+top_arrivals_sort <- head(arrivals[order(arrivals$arrival_count, decreasing = TRUE), ], n = 10)
+```
+
+```{r, cache = TRUE}
+
+
+# Loading NYC Geospatial Data from Open-Source Library
+nyc_boroughs_data <- GET("http://data.beta.nyc//dataset/0ff93d2d-90ba-457c-9f7e-39e47bf2ac5f/resource/35dd04fb-81b3-479b-a074-a27a37888ce7/download/d085e2f8d0b54d4590b1e7d1f35594c1pediacitiesnycneighborhoods.geojson")
+
+# Reading the spatial data
+neighborhoods <- readOGR(content(nyc_boroughs_data, "text"), "OGRGeoJSON", verbose = F)
+
+
+nyc <- data.frame(lat = citi$start_station_latitude, lng = citi$start_station_longitude, start_station_name = citi$start_station_name)
+```
+
+## First Let's Break up New York City by Neighborhood
+
+```{r}
+nyc_neighborhoods_map <- leaflet(neighborhoods) %>%
+    addTiles() %>%
+    addPolygons(popup = ~neighborhood, color = "navy", weight = 2) %>%
+    addProviderTiles("CartoDB.Positron")
+nyc_neighborhoods_map
+
+# Number of Stations by Neighborhood
+nyc <- nyc %>%
+    group_by(station = `start_station_name`, lat = `lat`, lng = `lng`) %>%
+    summarise(departure_count = n())
+
+# Merging the spatial data with citi long and lat coordinates
+nyc_spdf <- nyc
+coordinates(nyc_spdf) <- ~ lng + lat
+proj4string(nyc_spdf) <- proj4string(neighborhoods)
+matches <- over(nyc_spdf, neighborhoods)
+nyc <- cbind(nyc, matches)
+
+# Cleaning up Data
+nyc$neighborhood <- as.factor(nyc$neighborhood)
+nyc$borough <- as.factor(nyc$borough)
+nyc$boroughCode <- as.factor(nyc$boroughCode)
+```
+
+First, we broke out the New York City area by neighborhood using data from BetaNYC ([link](https://beta.nyc/)) in order to gain more granular insights into the New York CitiBike system.
+
+# Which Stations Have High Levels of Departures?
+```{r, cache = TRUE}
+# Grouping Number of Stations by Neighborhood
+stations_by_neighborhood <- nyc %>%
+    group_by(neighborhood) %>%
+    summarize(num_stations = n())
+
+# Merging Spatial Polygon Map with Grouped Dataframe
+map_data <- geo_join(neighborhoods, stations_by_neighborhood, by_sp = "neighborhood", by_df = "neighborhood")
+
+map_data <- subset(map_data, num_stations != "NA")
+
+pal <- colorNumeric(
+    palette = "Greens",
+    domain = range(map_data@data$num_stations, na.rm = TRUE)
+)
+
+
+# Neighborhoods Color-Coded by Number of CitiBike Stations + Number of Departures at Each Station
+num_stations_by_neighborhood <- leaflet(map_data) %>%
+    addTiles() %>%
+    addPolygons(
+        fillColor = ~ pal(num_stations), popup = paste(
+            map_data$neighborhood, "<br>", map_data$borough,
+            "<br>", map_data$num_stations, "stations"
+        ),
+        color = "black", weight = 1
+    ) %>%
+    addCircleMarkers(nyc$lng, nyc$lat,
+        popup = paste(nyc$station, "<br>", nyc$departure_count, "Departures"), data = nyc,
+        color = "gray", radius = nyc$departure_count / 100
+    ) %>%
+    addLegend(pal = pal, values = ~num_stations, title = "Number of Stations") %>%
+    addProviderTiles("CartoDB.Positron") %>%
+    setView(-73.98, 40.75, zoom = 13)
+# num_stations_by_neighborhood <- addLegend(map = num_stations_by_neighborhood, colors = )
+num_stations_by_neighborhood
+```
+
+Here, we have overlaid the number of departures by CitiBike station onto our neighborhood map, color-coded by total stations in that neighborhood. As you can see, the stations with the highest number of departures over our data set were concentrated on the island of Manhattan, particularly in the Midtown area. The contrast between stations in the heart of Manhattan with stations in Brooklyn and Queens is stark. Many stations in Manhattan have > 1,000 departures whereas many in the other boroughs have been utilized < 100 times. Additionally, although there are neighborhoods in Southern Manhattan with many less stations than Midtown, these stations still experience a relatively high number of departures. 
+
+
+# Which Stations Have Deficits and Surpluses?
+```{r}
+# Bike Deficits
+bike_deficit <- merge(departures, arrivals, all = TRUE)
+
+bike_deficit[is.na(bike_deficit)] <- 0
+
+bike_deficit$deficit <- bike_deficit$arrival_count - bike_deficit$departure_count
+
+bike_deficit_map <- leaflet(bike_deficit) %>%
+    addTiles() %>%
+    setView(-74, 40.75, zoom = 11.5) %>%
+    addCircleMarkers(
+        lng = bike_deficit$longitude, lat = bike_deficit$latitude,
+        popup = paste(
+            bike_deficit$station, "<br>", ifelse(bike_deficit$deficit >= 0, "Bike deficit = ", "Bike surplus = "),
+            abs(bike_deficit$deficit)
+        ),
+        radius = abs(bike_deficit$deficit) / 5, color = ifelse(bike_deficit$deficit > 0, "red", "green")
+    )
+
+bike_deficit_map
+```
+
+This map shows each station and its corresponding deficit or surplus, defined as arrivals - departures. As is to be expected, the stations with the highest deficits are concentrated in and around the island of Manhattan, likely from a large amount of commuters utilizing the system every day to travel to their place of work. Interestingly, many of these stations with significant deficits are quite close to multiple other stations with surpluses. Because of this discrepancy, we recommend CitiBike implement a dynamic model to incentivize riders to park at surplus stations, rather than deficit stations. CitiBike could implement an algorithm similar to Uber's, which uses multiple variables like time and distance to create prices for a given ride. CitiBike should create a similar model that offers riders ride credits, discounts or other perks to park at surplus stations. This would of course require CitiBike to track real-time deficits and surpluses at each station, as well as the level of bike inventory in order to scale the incentives accordingly.   
+
+# Which Stations Are Being Utilized Most Heavily and Least Heavily? 
+```{r}
+# Creating New Dataframe for Utilization
+citi_util <- merge(departures, arrivals)
+
+citi_bike_grouping <- data.frame(bike = distinct(citi, citi$bikeid))
+
+# Making rough assumptions regarding the average number of bikes at each station using the dataset
+tot_stations <- nrow(citi_util)
+tot_bikes <- nrow(citi_bike_grouping)
+avg_bikes <- tot_bikes %/% tot_stations
+
+# Calculating a utilization rate based on the average number of bikes at each station
+citi_util$util_rate <- (citi_util$departure_count / avg_bikes)
+
+
+
+# Grouping into the top and bottom deciles of bike utilization
+citi_util_sort <- sort(citi_util$util_rate, decreasing = TRUE)
+citi_util$decile <- ntile(citi_util$util_rate, n = 10)
+
+citi_util <- citi_util %>%
+    group_by(decile) %>%
+    filter(decile == 1 | decile == 10)
+
+# Map of the top and bottom deciles
+bike_util_map <- leaflet(citi_util) %>%
+    addTiles() %>%
+    setView(-74, 40.75, zoom = 11.5) %>%
+    addCircleMarkers(
+        lng = citi_util$longitude, lat = citi_util$latitude, popup = paste(citi_util$station, "<br>", "Bike Utilization:", round(citi_util$util_rate, 1)),
+        radius = 5, color = ifelse(citi_util$decile == 10, "green", "red")
+    ) %>%
+    addLegend(colors = c("green", "red"), labels = c("Top Decile", "Bottom Decile"))
+bike_util_map
+```
+
+For this visualization, we created a rough measure of each station's bike utilization using the data set and our own assumptions. First, we assume the average number of bikes at each station given the total number of bikes and stations in the data. Then, we calculated the number of 'turns' of this average based on the number of departures by station. We used departure counts rather than including arrivals because we wanted a measure of how many times bikes at a given station were taken and actually used. This map shows the top (green) and bottom (red) decile of stations based on bike utilization. As you can see, virtually all of the stations with top 10% (more than around 24 turns) levels of bike utilization are in Manhattan, whereas stations in the bottom 10% (less than 1) are mostly in Brooklyn. Based on this sample, we recommend CitiBike re-locate some of the least used stations from Brooklyn to Manhattan. This will balance the wear and tear that bikes are receiving and reduce the number of stations on Manhattan that have particularly high bike deficits. Using this tactic in addition to the incentive model we discussed prior could significantly smooth demand, inventory and usage. 
+
+# Which Stations are in the Top and Bottom Deciles of Deficit/Surplus?
+
+```{r, cache = TRUE}
+# Sorting stations by top and bottom 10% of deficit/surplus
+bike_deficit10percent <- sort(abs(bike_deficit$deficit), decreasing = TRUE)
+
+minimum <- bike_deficit10percent[length(bike_deficit10percent) %/% 10]
+
+bike_deficit_worststations <- bike_deficit[abs(bike_deficit$deficit) >= minimum, ]
+
+# Top and bottom stations for deficit/surplus
+bike_deficit_num_stations_map <- leaflet(map_data) %>%
+    addTiles() %>%
+    addPolygons(
+        fillColor = ~ pal(num_stations), popup = paste(
+            map_data$neighborhood, "<br>", map_data$borough,
+            "<br>", map_data$num_stations, "stations"
+        ),
+        color = "black", weight = 1
+    ) %>%
+    addCircleMarkers(
+        lng = bike_deficit_worststations$longitude, lat = bike_deficit_worststations$latitude,
+        popup = paste(
+            bike_deficit_worststations$station, "<br>", ifelse(bike_deficit_worststations$deficit >= 0, "Bike deficit = ", "Bike surplus = "),
+            abs(bike_deficit_worststations$deficit)
+        ),
+        radius = abs(bike_deficit_worststations$deficit) / 5, color = ifelse(bike_deficit_worststations$deficit > 0, "red", "green")
+    ) %>%
+    addLegend(pal = pal, values = ~num_stations, title = "Number of Stations") %>%
+    addProviderTiles("CartoDB.Positron") %>%
+    setView(-73.98, 40.75, zoom = 12)
+
+bike_deficit_num_stations_map
+```
+
+# Table and Map of the Best and Worst 5 Stations for Deficits 
+
+```{r}
+bike_deficit_table <- head(bike_deficit_worststations[order(bike_deficit_worststations$deficit, decreasing = TRUE), ], n = 97)
+bike_deficit_table_worst <- tail(bike_deficit_table, n = 5)
+
+
+bike_deficit_table_best <- head(bike_deficit_table, n = 5)
+
+
+bike_deficit_table_merged <- rbind(bike_deficit_table_best, bike_deficit_table_worst)
+
+paged_table(bike_deficit_table_merged)
+
+leaflet(map_data) %>%
+    addTiles() %>%
+    addPolygons(
+        fillColor = ~ pal(num_stations), popup = paste(
+            map_data$neighborhood, "<br>", map_data$borough,
+            "<br>", map_data$num_stations, "stations"
+        ),
+        color = "black", weight = 1
+    ) %>%
+    addCircleMarkers(
+        lat = bike_deficit_table_merged$latitude, lng = bike_deficit_table_merged$longitude, popup = paste(
+            bike_deficit_table_merged$station, "<br>", ifelse(bike_deficit_table_merged$deficit >= 0, "Bike deficit = ", "Bike surplus = "),
+            abs(bike_deficit_table_merged$deficit)
+        ),
+        radius = abs(bike_deficit_table_merged$deficit) / 5, color = ifelse(bike_deficit_table_merged$deficit > 0, "red", "green")
+    ) %>%
+    addLegend(pal = pal, values = ~num_stations, title = "Number of Stations") %>%
+    addProviderTiles("CartoDB.Positron") %>%
+    setView(-73.98, 40.75, zoom = 12)
+```
+
+These maps and table show the top and bottom deciles of station deficits as well as the 5 best and 5 worst offenders. We recommmend CitiBike use these visualizations in accordance with our earlier recommendations around creating incentives and re-locating stations. The best/worst stations above can serve as 'beta tests' for these recommendations. CitiBike could move a number of the least-utilized stations from Brooklyn adjacent to stations in Manhattan with the highest deficits, while testing the incentive model to measure the effect, for example. 
+
+```{r, cache = TRUE}
+# # Setting up Google Maps for GGMap
+#
+# register_google(key = "AIzaSyDxyRFV0NHnZ99rET9h9BAf0qeMqlZaEeg", account_type = "standard")
+# ggmap_hide_api_key()
+# base_nyc <- get_map(location = c(lon = -73.9857, lat =40.7484 ), zoom = 12, size = c(640,640) )
+#
+# # Cleaning Data
+# citi$starttime <- as.POSIXct(strptime(citi$starttime, "%Y-%m-%d %H:%M:%S"))
+# citi$stoptime <- as.POSIXct(strptime(citi$stoptime, "%Y-%m-%d %H:%M:%S"))
+# citi$starthour <- hour(citi$starttime)
+# citi$day <- as.Date(citi$starttime)
+# citi$month <- as.factor(month(citi$starttime))
+# citi$numWeekday <- wday(citi$starttime)
+# citi$dayid <- as.factor(ifelse(citi$numWeekday < 6, "Weekday", "Weekend"))
+# citi$weekNum <- as.numeric(strftime(citi$starttime, format = "%V"))
+#
+#
+# citi_ggmap_2 <- citi %>%
+#   group_by(day = day, starttime = starttime, lng = start_station_longitude, lat = start_station_latitude,
+#            station = start_station_name) %>%
+#   summarize(dep = n()) %>%
+#   filter(day == "2019-06-01")
+#
+# library(ggplot2)
+# library(gganimate)
+#
+# # Animated Departure Map over One Day
+# dep_map <- ggmap(base_nyc) +
+#   geom_point(citi_ggmap_2, mapping = aes(x = citi_ggmap_2$lng, y = citi_ggmap_2$lat), size = 5, color = "red") +
+#   transition_states(citi_ggmap_2$starttime) +
+#   shadow_mark(color = "black")
+# dep_map
+```
+
+```{r, cache = TRUE}
+# citi_ggmap_3 <- citi %>%
+#   group_by(day = day, stoptime = stoptime, lng = end_station_longitude, lat = end_station_latitude,
+#            station = end_station_name) %>%
+#   summarize(arr = n()) %>%
+#   filter(day == "2019-06-01")
+#
+#
+# # Animated Arrival Map over One Day
+# library(ggcats)
+# arr_map <- ggmap(base_nyc) +
+#   geom_cat(citi_ggmap_3, mapping = aes(x = citi_ggmap_3$lng, y = citi_ggmap_3$lat), size = 4, cat = "toast") +
+#   transition_states(citi_ggmap_3$stoptime) +
+#   shadow_mark(past = TRUE)
+# arr_map
+```
+
+```{r, cache = TRUE}
+# citi_ggmap_4 <- citi %>%
+#   group_by(day = day, station = start_station_name, lng = start_station_longitude, lat = start_station_latitude) %>%
+#   summarize(dep = n())
+#
+#
+# # Animate Heat Map of Departures Over ~2 Months
+# heatmap <- ggmap(base_nyc) +
+#   geom_bin_2d(data = citi_ggmap_4, mapping = aes(x = citi_ggmap_4$lng, y = citi_ggmap_4$lat), bins = 40) +
+#   transition_states(citi_ggmap_4$day) +
+#   labs(title = "Date: {closest_state}")
+# heatmap
+
+```
+
+
+
+
+
 
