@@ -1,10 +1,10 @@
 ---
 title: "Asymmetric Traffic"
-author: "Ian Cooper"
-date: "12/2/2021"
 output: 
   html_document:
     code_folding: hide
+    toc: true
+    toc_float: true
   pd_document: default
     
 ---
@@ -66,16 +66,16 @@ departures <- citi %>%
   group_by(station = `start.station.name`, latitude = `start.station.latitude`, longitude = `start.station.longitude`) %>%
   summarise(departure_count = n())
 
-
+# Sorting by top departures
 top_departures_sort <- head(departures[order(departures$departure_count, decreasing = TRUE),], n = 10)
 
-
+# Stations with the highest number of arrivals
 arrivals <- citi %>%
   group_by(station = `end.station.name`, latitude = `end.station.latitude`, longitude = `end.station.longitude`) %>%
   summarise(arrival_count = n())
-
+# Sorting by top arrivals
 top_arrivals_sort <- head(arrivals[order(arrivals$arrival_count, decreasing = TRUE),], n = 10)
-  
+
 ```
 
 ```{r, cache = TRUE}
@@ -97,8 +97,11 @@ neighborhoods <- readOGR(content(nyc_boroughs_data, 'text'), 'OGRGeoJSON', verbo
 
 
 nyc <- data.frame(lat= citi$start.station.latitude, lng= citi$start.station.longitude, start.station.name = citi$start.station.name)
+```
 
-# Testing NYC Neighborhoods Map
+## First Let's Break up New York City by Neighborhood
+
+```{r}
 nyc_neighborhoods_map <- leaflet(neighborhoods) %>%
   addTiles() %>%
   addPolygons(popup = ~neighborhood, color = "navy", weight = 2) %>%
@@ -110,6 +113,7 @@ nyc <- nyc %>%
   group_by(station = `start.station.name`, lat = `lat`, lng = `lng`) %>%
   summarise(departure_count = n())
 
+# Merging the spatial data with citi long and lat coordinates
 nyc_spdf <- nyc
 coordinates(nyc_spdf) <- ~lng + lat
 proj4string(nyc_spdf) <- proj4string(neighborhoods)
@@ -120,50 +124,11 @@ nyc <- cbind(nyc, matches)
 nyc$neighborhood <- as.factor(nyc$neighborhood)
 nyc$borough <- as.factor(nyc$borough)
 nyc$boroughCode <- as.factor(nyc$boroughCode)
-
-
 ```
 
-```{r, cache = TRUE}
-# Creating New Dataframe for Utilization 
-citi_util <- merge(departures, arrivals)
+First, we broke out the New York City area by neighborhood using data from BetaNYC ([link](https://beta.nyc/)) in order to gain more granular insights into the New York CitiBike system.
 
-
-# Making rough assumptions regarding the average number of bikes at each station using the dataset 
-tot_stations = 829
-tot_bikes = 19095
-avg_bikes <- tot_bikes%/%tot_stations
-
-# Calculating a turnover rate based on the average number of bikes at each station
-citi_util$util_rate <- (citi_util$departure_count / avg_bikes)
-
-
-
-# Grouping into the top and bottom deciles of bike turnover
-citi_util_sort <- sort(citi_util$util_rate, decreasing = TRUE)
-
-
-citi_util$decile <- ntile(citi_util$util_rate, n = 10 )
-
-citi_util <- citi_util %>%
-  group_by(decile) %>%
-  filter(decile == 1 | decile == 10)
-
-
-
-
-# Map of the top and bottom deciles
-bike_turnover_map <- leaflet(citi_util) %>%
-  addTiles() %>%
-  setView(-74, 40.75, zoom = 11.5) %>%
-  addCircleMarkers(lng = citi_util$longitude, lat = citi_util$latitude, popup = paste(citi_util$station, "<br>", "Bike Turnover:", round(citi_util$util_rate,1)),
-                   radius = 5, color = ifelse(citi_util$decile == 10, "green", "red")) %>%
-  addLegend(colors = c("green", "red"), labels = c("Top Decile", "Bottom Decile")) 
-bike_turnover_map
-
-
-```
-
+# Which Stations Have High Levels of Departures?
 ```{r, cache = TRUE}
 # Grouping Number of Stations by Neighborhood
 stations_by_neighborhood <- nyc %>%
@@ -194,7 +159,11 @@ num_stations_by_neighborhood <- leaflet(map_data) %>%
 num_stations_by_neighborhood
 ```
 
-```{r, cache = TRUE}
+Here, we have overlaid the number of departures by CitiBike station onto our neighborhood map, color-coded by total stations in that neighborhood. As you can see, the stations with the highest number of departures over our data set were concentrated on the island of Manhattan, particularly in the Midtown area. The contrast between stations in the heart of Manhattan with stations in Brooklyn and Queens is stark. Many stations in Manhattan have > 1,000 departures whereas many in the other boroughs have been utilized < 100 times. Additionally, although there are neighborhoods in Southern Manhattan with many less stations than Midtown, these stations still experience a relatively high number of departures. 
+
+
+# Which Stations Have Deficits and Surpluses?
+```{r}
 # Bike Deficits
 bike_deficit <- merge(departures, arrivals, all = TRUE)
 
@@ -212,12 +181,59 @@ bike_deficit_map <-leaflet(bike_deficit) %>%
 
 bike_deficit_map
 
+```
+
+This map shows each station and its corresponding deficit or surplus, defined as arrivals - departures. As is to be expected, the stations with the highest deficits are concentrated in and around the island of Manhattan, likely from a large amount of commuters utilizing the system every day to travel to their place of work. Interestingly, many of these stations with significant deficits are quite close to multiple other stations with surpluses. Because of this discrepancy, we recommend CitiBike implement a dynamic model to incentivize riders to park at surplus stations, rather than deficit stations. CitiBike could implement an algorithm similar to Uber's, which uses multiple variables like time and distance to create prices for a given ride. CitiBike should create a similar model that offers riders ride credits, discounts or other perks to park at surplus stations. This would of course require CitiBike to track real-time deficits and surpluses at each station, as well as the level of bike inventory in order to scale the incentives accordingly.   
+
+# Which Stations Are Being Utilized Most Heavily and Least Heavily? 
+```{r}
+# Creating New Dataframe for Utilization 
+citi_util <- merge(departures, arrivals)
+
+citi_bike_grouping <- data.frame(bike = distinct(citi, citi$bikeid))
+
+# Making rough assumptions regarding the average number of bikes at each station using the dataset 
+tot_stations <- nrow(citi_util)
+tot_bikes = nrow(citi_bike_grouping)
+avg_bikes <- tot_bikes%/%tot_stations
+
+# Calculating a utilization rate based on the average number of bikes at each station
+citi_util$util_rate <- (citi_util$departure_count / avg_bikes)
+
+
+
+# Grouping into the top and bottom deciles of bike utilization
+citi_util_sort <- sort(citi_util$util_rate, decreasing = TRUE)
+citi_util$decile <- ntile(citi_util$util_rate, n = 10 )
+
+citi_util <- citi_util %>%
+  group_by(decile) %>%
+  filter(decile == 1 | decile == 10)
+
+# Map of the top and bottom deciles
+bike_util_map <- leaflet(citi_util) %>%
+  addTiles() %>%
+  setView(-74, 40.75, zoom = 11.5) %>%
+  addCircleMarkers(lng = citi_util$longitude, lat = citi_util$latitude, popup = paste(citi_util$station, "<br>", "Bike Utilization:", round(citi_util$util_rate,1)),
+                   radius = 5, color = ifelse(citi_util$decile == 10, "green", "red")) %>%
+  addLegend(colors = c("green", "red"), labels = c("Top Decile", "Bottom Decile")) 
+bike_util_map
+
+```
+
+For this visualization, we created a rough measure of each station's bike utilization using the data set and our own assumptions. First, we assume the average number of bikes at each station given the total number of bikes and stations in the data. Then, we calculated the number of 'turns' of this average based on the number of departures by station. We used departure counts rather than including arrivals because we wanted a measure of how many times bikes at a given station were taken and actually used. This map shows the top (green) and bottom (red) decile of stations based on bike utilization. As you can see, virtually all of the stations with top 10% (more than around 24 turns) levels of bike utilization are in Manhattan, whereas stations in the bottom 10% (less than 1) are mostly in Brooklyn. Based on this sample, we recommend CitiBike re-locate some of the least used stations from Brooklyn to Manhattan. This will balance the wear and tear that bikes are receiving and reduce the number of stations on Manhattan that have particularly high bike deficits. Using this tactic in addition to the incentive model we discussed prior could significantly smooth demand, inventory and usage. 
+
+# Which Stations are in the Top and Bottom Deciles of Deficit/Surplus?
+
+```{r, cache = TRUE}
+# Sorting stations by top and bottom 10% of deficit/surplus
 bike_deficit10percent<-sort(abs(bike_deficit$deficit),decreasing = TRUE)
 
 minimum<-bike_deficit10percent[length(bike_deficit10percent)%/%10]
 
 bike_deficit_worststations<-bike_deficit[abs(bike_deficit$deficit)>=minimum,]
 
+# Top and bottom stations for deficit/surplus
 bike_deficit_num_stations_map <- leaflet(map_data) %>%
   addTiles() %>%
   addPolygons(fillColor = ~pal(num_stations), popup = paste(map_data$neighborhood, "<br>", map_data$borough,
@@ -232,8 +248,11 @@ bike_deficit_num_stations_map <- leaflet(map_data) %>%
   setView(-73.98, 40.75, zoom = 12)
 
 bike_deficit_num_stations_map
+```
 
+# Table and Map of the Best and Worst 5 Stations for Deficits 
 
+```{r}
 bike_deficit_table <- head(bike_deficit_worststations[order(bike_deficit_worststations$deficit, decreasing = TRUE),], n = 97)
 bike_deficit_table_worst <-tail(bike_deficit_table, n = 5)
 
@@ -245,43 +264,6 @@ library(rmarkdown)
 bike_deficit_table_merged <- rbind(bike_deficit_table_best, bike_deficit_table_worst)
 
 paged_table(bike_deficit_table_merged)
-
-# citi
-# citi$bikeid <- as.factor(citi$bikeid)
-# bike_usage <- citi %>%
-#   group_by(bikeid) %>%
-#   summarize(rides = n())
-# bike_usage
-# 
-# 
-# bike_usage10percent<-sort(bike_usage$rides,decreasing = TRUE)
-# bike_usage10percent
-# 
-# 
-# top10 <-bike_usage10percent[length(bike_usage10percent)%/%10]
-# 
-# bike_usage_top10 <-bike_usage[bike_usage$rides>=top10,]
-# 
-# bike_usage_top10
-# 
-# num_top10 <- sum(bike_usage_top10$rides)
-# num_top10
-# 
-# bike_usage_bot90 <-bike_usage[bike_usage$rides<top10,]
-# bike_usage_bot90
-# 
-# num_bot90 <- sum(bike_usage_bot90$rides)
-# num_bot90
-# 
-# Bike_Share <- c('Bottom 90%', 'Top 10%')
-# Ride_Share <- c(num_bot90, num_top10)
-# 
-# bike_dist <- data.frame(Bike_Share, Ride_Share )
-# bike_dist
-# bike_dist$Bike_Share <- as.factor(bike_dist$Bike_Share)
-# bike_dist
-
-# ggplot(bike_dist, aes(x = Bike_Share, y = Ride_Share)) + geom_col()
 
 leaflet(map_data) %>%
   addTiles() %>%
@@ -298,70 +280,74 @@ leaflet(map_data) %>%
 
 ```
 
+These maps and table show the top and bottom deciles of station deficits as well as the 5 best and 5 worst offenders. We recommmend CitiBike use these visualizations in accordance with our earlier recommendations around creating incentives and re-locating stations. The best/worst stations above can serve as 'beta tests' for these recommendations. CitiBike could move a number of the least-utilized stations from Brooklyn adjacent to stations in Manhattan with the highest deficits, while testing the incentive model to measure the effect, for example. 
+
 ```{r, cache = TRUE}
-# Setting up Google Maps for GGMap
-library(ggmap)
-register_google(key = "AIzaSyDxyRFV0NHnZ99rET9h9BAf0qeMqlZaEeg", account_type = "standard")
-base_nyc <- get_map(location = c(lon = -73.9857, lat =40.7484 ), zoom = 12, size = c(640,640) )
-
-# Cleaning Data
-library(lubridate)
-citi$starttime <- as.POSIXct(strptime(citi$starttime, "%Y-%m-%d %H:%M:%S"))
-citi$stoptime <- as.POSIXct(strptime(citi$stoptime, "%Y-%m-%d %H:%M:%S"))
-citi$starthour <- hour(citi$starttime)
-citi$day <- as.Date(citi$starttime)
-citi$month <- as.factor(month(citi$starttime))
-citi$numWeekday <- wday(citi$starttime)
-citi$dayid <- as.factor(ifelse(citi$numWeekday < 6, "Weekday", "Weekend"))
-citi$weekNum <- as.numeric(strftime(citi$starttime, format = "%V"))
-
-
-citi_ggmap_2 <- citi %>%
-  group_by(day = day, starttime = starttime, lng = start.station.longitude, lat = start.station.latitude,
-           station = start.station.name) %>%
-  summarize(dep = n()) %>%
-  filter(day == "2019-06-01")
-
-library(ggplot2)
-library(gganimate)
-
-# Animated Departure Map over One Day
-dep_map <- ggmap(base_nyc) +
-  geom_point(citi_ggmap_2, mapping = aes(x = citi_ggmap_2$lng, y = citi_ggmap_2$lat), size = 5, color = "red") +
-  transition_states(citi_ggmap_2$starttime) +
-  shadow_mark(color = "black")
-dep_map
+# # Setting up Google Maps for GGMap
+# library(ggmap)
+# 
+# register_google(key = "AIzaSyDxyRFV0NHnZ99rET9h9BAf0qeMqlZaEeg", account_type = "standard")
+# ggmap_hide_api_key()
+# base_nyc <- get_map(location = c(lon = -73.9857, lat =40.7484 ), zoom = 12, size = c(640,640) )
+# 
+# # Cleaning Data
+# library(lubridate)
+# citi$starttime <- as.POSIXct(strptime(citi$starttime, "%Y-%m-%d %H:%M:%S"))
+# citi$stoptime <- as.POSIXct(strptime(citi$stoptime, "%Y-%m-%d %H:%M:%S"))
+# citi$starthour <- hour(citi$starttime)
+# citi$day <- as.Date(citi$starttime)
+# citi$month <- as.factor(month(citi$starttime))
+# citi$numWeekday <- wday(citi$starttime)
+# citi$dayid <- as.factor(ifelse(citi$numWeekday < 6, "Weekday", "Weekend"))
+# citi$weekNum <- as.numeric(strftime(citi$starttime, format = "%V"))
+# 
+# 
+# citi_ggmap_2 <- citi %>%
+#   group_by(day = day, starttime = starttime, lng = start.station.longitude, lat = start.station.latitude,
+#            station = start.station.name) %>%
+#   summarize(dep = n()) %>%
+#   filter(day == "2019-06-01")
+# 
+# library(ggplot2)
+# library(gganimate)
+# 
+# # Animated Departure Map over One Day
+# dep_map <- ggmap(base_nyc) +
+#   geom_point(citi_ggmap_2, mapping = aes(x = citi_ggmap_2$lng, y = citi_ggmap_2$lat), size = 5, color = "red") +
+#   transition_states(citi_ggmap_2$starttime) +
+#   shadow_mark(color = "black")
+# dep_map
 ```
 
 ```{r, cache = TRUE}
-citi_ggmap_3 <- citi %>%
-  group_by(day = day, stoptime = stoptime, lng = end.station.longitude, lat = end.station.latitude,
-           station = end.station.name) %>%
-  summarize(arr = n()) %>%
-  filter(day == "2019-06-01")
-
-
-# Animated Arrival Map over One Day
-library(ggcats)
-arr_map <- ggmap(base_nyc) +
-  geom_cat(citi_ggmap_3, mapping = aes(x = citi_ggmap_3$lng, y = citi_ggmap_3$lat), size = 4, cat = "toast") +
-  transition_states(citi_ggmap_3$stoptime) +
-  shadow_mark(past = TRUE)
-arr_map
+# citi_ggmap_3 <- citi %>%
+#   group_by(day = day, stoptime = stoptime, lng = end.station.longitude, lat = end.station.latitude,
+#            station = end.station.name) %>%
+#   summarize(arr = n()) %>%
+#   filter(day == "2019-06-01")
+# 
+# 
+# # Animated Arrival Map over One Day
+# library(ggcats)
+# arr_map <- ggmap(base_nyc) +
+#   geom_cat(citi_ggmap_3, mapping = aes(x = citi_ggmap_3$lng, y = citi_ggmap_3$lat), size = 4, cat = "toast") +
+#   transition_states(citi_ggmap_3$stoptime) +
+#   shadow_mark(past = TRUE)
+# arr_map
 ```
 
 ```{r, cache = TRUE}
-citi_ggmap_4 <- citi %>%
-  group_by(day = day, station = start.station.name, lng = start.station.longitude, lat = start.station.latitude) %>%
-  summarize(dep = n())
-
-
-# Animate Heat Map of Departures Over ~2 Months
-heatmap <- ggmap(base_nyc) +
-  geom_bin_2d(data = citi_ggmap_4, mapping = aes(x = citi_ggmap_4$lng, y = citi_ggmap_4$lat), bins = 40) +
-  transition_states(citi_ggmap_4$day) +
-  labs(title = "Date: {closest_state}")
-heatmap
+# citi_ggmap_4 <- citi %>%
+#   group_by(day = day, station = start.station.name, lng = start.station.longitude, lat = start.station.latitude) %>%
+#   summarize(dep = n())
+# 
+# 
+# # Animate Heat Map of Departures Over ~2 Months
+# heatmap <- ggmap(base_nyc) +
+#   geom_bin_2d(data = citi_ggmap_4, mapping = aes(x = citi_ggmap_4$lng, y = citi_ggmap_4$lat), bins = 40) +
+#   transition_states(citi_ggmap_4$day) +
+#   labs(title = "Date: {closest_state}")
+# heatmap
 
 ```
 
