@@ -19,7 +19,6 @@ knitr::opts_chunk$set(message = FALSE)
 knitr::opts_chunk$set(warning = FALSE)
 knitr::opts_chunk$set(cache = TRUE)
 knitr::opts_chunk$set(cache.lazy = FALSE)
-knitr::opts_chunk$set(tigris_use_cache = TRUE)
 ```
 
 # Intro
@@ -52,10 +51,8 @@ library(tigris)
 ## Load Data
 
 ```{r data}
-# citi <- read_csv("citicleaned.csv")
 citi <- read_csv("citiall.csv")
 citi <- clean_names(citi)
-# citi <- citi[, -1]
 
 citi$start_station_name <- as.factor(citi$start_station_name)
 citi$start_station_id <- as.factor(citi$start_station_id)
@@ -64,23 +61,27 @@ citi$end_station_id <- as.factor(citi$end_station_id)
 citi$usertype <- as.factor(citi$usertype)
 citi$gender <- as.factor(citi$gender)
 citi$dayid <- as.factor(citi$dayid)
+```
 
-# str(citi)
-
+```{r weather-data}
 weather <- read_csv("NYCWeather2019.csv")
 weather$STATION <- NULL
 weather$NAME <- NULL
 weather$Date <- as.Date(weather$DATE, format = "%m/%d/%Y")
 weather$DATE <- NULL
 weather$TAVG <- (weather$TMAX + weather$TMIN) / 2
+```
 
-# str(weather)
-
-citi <- merge(citi, weather, by.x = "day", by.y = "Date")
+```{r weather-merge}
+citi <- inner_join(citi, weather, by = c("day" = "Date"))
 str(citi)
 ```
 
-Citibike system data was used from [this](https://ride.citibikenyc.com/system-data) data repository. We also used weather data provided from NWS. 
+```{r citi-sample}
+citi_sample <- sample_frac(citi, 0.05)
+```
+
+Citibike system data was used from [this](https://ride.citibikenyc.com/system-data) data repository. We also used weather data provided from NWS. The full data set with over 20 million rides was used for most visualizations, but a 5% sample was used for examples including regression for the purpose of simplicity.
 
 # Weather 
 
@@ -110,13 +111,12 @@ animatetempchart <- ggplot(weather, aes(Date, TAVG, group = month(Date), colour 
     transition_reveal(Date)
 animatetempchart
 ```
-
 This animated chart is meant to inform the management on temperature movements thorughout the year for the purposes of fulfilling the aforementioned plan to have less bikes on the streets when its too hot/too cold, based on the graph that we have depicted first in this section of the Report. If we run a cross section, it would makes sense to have all of our bikes on the road from the months of May through the end of October. In the other months, we can have less bikes on the streets without having to worry about utilization issues, except for those stations that we are going to discuss later in this report.
 
 
 ## What effect does Temperature Have on the Speed of Riders?
 ```{r tempspeedchart}
-tempspeedchart <- ggplot(citi, aes(x = TAVG, y = speed)) +
+tempspeedchart <- ggplot(citi_sample, aes(x = TAVG, y = speed)) +
     geom_point(alpha = 0.2) +
     geom_smooth(method = lm) +
     stat_regline_equation() +
@@ -126,12 +126,13 @@ tempspeedchart <- ggplot(citi, aes(x = TAVG, y = speed)) +
 tempspeedchart
 ```
 
+
 The main point of analyzing the speed of riders is to know how fast they are getting from point A to point B in order to fulfill our services to other customers that may be waiting for bikes at a specific station and/or lookng for a station with Bikes. The faster riders go, the less time they spend on bikes. That being said, we see here that as temperature increases, there is a negative trend to speed. This means that in the summer months, there are probably more leisure riders tying to see the city rather than get to point B as fast as possible. In addition to this, we ned to consider the relationship in the context of utilization. As stated before, we are looking to have the least amount of wait times for our customers as possible with high, but not overburdened utilization. This means that we should expect there to be higher capacity utilization in the months where it is warmer due to reduced speeds of our riders.
 
 
 ## What Effect does Temperature Have on the Distance of Trips?
 ```{r tempdistchart}
-tempdistchart <- ggplot(citi, aes(x = TAVG, y = distmeters)) +
+tempdistchart <- ggplot(citi_sample, aes(x = TAVG, y = distmeters)) +
     geom_point(alpha = 0.2) +
     geom_smooth(method = lm) +
     stat_regline_equation() +
@@ -146,7 +147,7 @@ Simply put, this graph shows the relationship between distance traveled and the 
 
 ## What Effect Does Precipitation Have on the Speed of Riders?
 ```{r prcpspeedchart}
-prcpspeedchart <- ggplot(citi, aes(x = PRCP, y = speed)) +
+prcpspeedchart <- ggplot(citi_sample, aes(x = PRCP, y = speed)) +
     geom_point(alpha = 0.2) +
     geom_smooth(method = lm) +
     stat_regline_equation() +
@@ -161,7 +162,7 @@ Obviously no one likes to be in the rain. This is why we have plotted the relati
 
 ## What Effect Does Precipitation Have on the Distance of Trips?
 ```{r prcpdistchart}
-prcpdistchart <- ggplot(citi, aes(x = PRCP, y = distmeters)) +
+prcpdistchart <- ggplot(citi_sample, aes(x = PRCP, y = distmeters)) +
     geom_point(alpha = 0.2) +
     geom_smooth(method = lm) +
     stat_regline_equation() +
@@ -213,7 +214,7 @@ tempuserchart
 ## What Effect Does Wind Have on the Speed of Riders?
 
 ```{r windspeedchart}
-windspeedchart <- ggplot(citi, aes(x = AWND, y = speed)) +
+windspeedchart <- ggplot(citi_sample, aes(x = AWND, y = speed)) +
     geom_point(alpha = 0.2) +
     geom_smooth(method = lm) +
     stat_regline_equation() +
@@ -229,7 +230,7 @@ There is a significantly greater increase in rider speed when there is precipita
 ## What Effect Does Wind Have on the Distance of Trips?
 
 ```{r winddistchart}
-winddistchart <- ggplot(citi, aes(x = AWND, y = distmeters)) +
+winddistchart <- ggplot(citi_sample, aes(x = AWND, y = distmeters)) +
     geom_point(alpha = 0.2) +
     geom_smooth(method = lm) +
     stat_regline_equation() +
@@ -245,7 +246,7 @@ Wind seems to have a minimal effect on how far bikers ride compared to the effec
 ## Does Temperature Impact the Age of Riders?
 
 ```{r tempagechart}
-tempagechart <- ggplot(citi, aes(x = TAVG, y = age, color = usertype)) +
+tempagechart <- ggplot(citi_sample, aes(x = TAVG, y = age, color = usertype)) +
     geom_point(alpha = 0.2) +
     geom_smooth(method = lm) +
     stat_regline_equation() +
@@ -292,7 +293,7 @@ Routes <- arrange(summarize(Routes, Trips = n(), PercentofTotal = round(n() / nr
 head(Routes, n = 10)
 ```
 
-TODO: UPDATE THESE RESULTS. Of the `r nrow(citi)` trips sampled, there were `r nrow(Routes)`  unique routes, suggesting that no one route is extremely popular amongst New Yorkers and that evaluating individual routes over time would not be statistically significant. In fact, the top 10 most popular routes combined represent less than 0.4% of total trips. Funny enough, 3 of the 10 most popular routes (#2, #5 and #10) involve both picking up and dropping off your bike at the exact same location! 
+Of the `r nrow(citi)` trips sampled, there were `r nrow(Routes)` unique routes, suggesting that no one route is extremely popular amongst New Yorkers and that evaluating individual routes over time would not be statistically significant. In fact, the top 10 most popular routes combined represent less than 0.4% of total trips. Funny enough, 3 of the 10 most popular routes (#2, #5 and #10) involve both picking up and dropping off your bike at the exact same location! 
 
 ## Does Age Affect the Speed of Riders? 
 
@@ -320,7 +321,7 @@ A person's age appears to have a significant impact on the speed at which they r
 
 
 ## Do Trip Durations Differ By Month Across Genders? 
-```{rgender_plot}
+```{r gender_plot}
 # Creating the Summarized Dataset for Men and Women
 Gender_Trips <- filter(citi, gender != "unknown") %>%
     group_by(month, gender) %>%
@@ -388,7 +389,7 @@ avg_bike_usage %>%
     ylab("Count")
 ```
 
-The above histogram depicts the distribution of average daily rides across all bikes. TODO: Interpret histogram.
+The above histogram depicts the distribution of average daily rides across all bikes. It seems that the vast majority of bikes are ridden about 5 times per day, but there is an interesting trimodal distribution where lots of bikes are ridden 7 times per day, and another subset of bikes are ridden between 10 and 20 times per day. 
 
 
 ## How does bike usage change month to month?
@@ -410,7 +411,7 @@ monthly_usage %>%
     ylab("Count")
 ```
 
-The above histograms depict the distribution of the number of rides on each bike across each month.
+The above histograms depict the distribution of the number of rides on each bike across each month. It is very intersting to note that in the warmer months between May and November, there are bimodal distributions where a small subset of bikes are being ridden much more frequently than the rest of the bikes. We hypothesize this is due to the effects of higher tourism during those warmer months.
 
 ## What bikes are used the most?
 
@@ -431,7 +432,7 @@ bike_usage %>%
     ylab("Count")
 ```
 
-Now we broke bike usage out across the entire year to see if some bikes are being ridden more on a year-long basis. The above histogram shows bike usage the number of rides per bikes. TODO: Interpret histogram
+Now we broke bike usage out across the entire year to see if some bikes are being ridden more on a year-long basis. The above histogram shows bike usage the number of rides per bikes. The vast majority of bikes are ridden on average 1000 times per year, but there is a small subset of bikes that are ridden on average approximately 2700 times per year.
 
 ## Do certain bikes make it back to the same stations?
 
