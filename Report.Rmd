@@ -330,7 +330,7 @@ Stations_Map <- leaflet() %>%
 Stations_Map
 ```
 
-The most popular stations for both departing (represented by markers) and arriving (represented by circles) are scattered throughout New York City. One particularly interesting finding is that many of the most popular stations to leave from are also the most popular stations to arrive to, which helps regulate the flow of bikes around New York city 
+The most popular stations for both departing (represented by markers) and arriving (represented by circles) are scattered throughout New York City. One particularly interesting finding is that all of the most popular stations to leave from are also the most popular stations to arrive to, which helps regulate the flow of bikes around New York city 
 
 
 ## What are the Most Popular Routes? 
@@ -425,7 +425,7 @@ daily_usage %>%
     ylab("Count")
 ```
 
-The above histogram depicts the number of rides per day per bike. Most bikes are ridden very infrequently. The number of bikes with more than 2 rides per day is just `r daily_usage %>% filter(num_rides > 2) %>% nrow()`. The number of bikes with more than 3 rides per day is just `r daily_usage %>% filter(num_rides > 3) %>% nrow()`.
+The above histogram depicts the number of rides per day per bike. Most bikes are ridden reasonably frequently, about 5-10 times per day.
 
 ### Average number of rides per given bike
 ```{r avg_bike_usage}
@@ -466,7 +466,7 @@ monthly_usage %>%
     ylab("Count")
 ```
 
-The above histograms depict the distribution of the number of rides on each bike across each month. It is very intersting to note that in the warmer months between May and November, there are bimodal distributions where a small subset of bikes are being ridden much more frequently than the rest of the bikes. We hypothesize this is due to the effects of higher tourism during those warmer months.
+The above histograms depict the distribution of the number of rides on each bike across each month. It is very intersting to note that in the warmer months between May and November, there are bimodal distributions where a small subset of bikes are being ridden much more frequently than the rest of the bikes. And suggests that that subset of bikes is being ridden by a different group of people perhaps. We hypothesize this is due to the effects of higher tourism during those warmer months, and that the bikes ridden by tourists may not be mixing with other bikes. 
 
 ## What bikes are used the most?
 
@@ -706,7 +706,7 @@ num_stations_by_neighborhood <- leaflet(map_data) %>%
 num_stations_by_neighborhood
 ```
 
-Here, we have overlaid the number of departures by CitiBike station onto our neighborhood map, color-coded by total stations in that neighborhood. As you can see, the stations with the highest number of departures over our data set were concentrated on the island of Manhattan, particularly in the Midtown area. The contrast between stations in the heart of Manhattan with stations in Brooklyn and Queens is stark. Many stations in Manhattan have > 1,000 departures whereas many in the other boroughs have been utilized < 100 times. Additionally, although there are neighborhoods in Southern Manhattan with many less stations than Midtown, these stations still experience a relatively high number of departures. 
+Here, we have overlaid the number of departures by CitiBike station onto our neighborhood map, color-coded by total stations in that neighborhood. As you can see, the stations with the highest number of departures over our data set were concentrated on the island of Manhattan, particularly in the Midtown area. The contrast between stations in the heart of Manhattan with stations in Brooklyn and Queens is stark. Many stations in Manhattan have > 50,000 departures whereas many in the other boroughs have been utilized < 1,000 times. Additionally, although there are neighborhoods in Southern Manhattan with many less stations than Midtown, these stations still experience a relatively high number of departures. 
 
 
 ## Which Stations Have Deficits and Surpluses?
@@ -776,7 +776,7 @@ bike_util_map <- leaflet(citi_util) %>%
 bike_util_map
 ```
 
-For this visualization, we created a rough measure of each station's bike utilization using the data set and our own assumptions. First, we assume the average number of bikes at each station given the total number of bikes and stations in the data. Then, we calculated the number of 'turns' of this average based on the number of departures by station. We used departure counts rather than including arrivals because we wanted a measure of how many times bikes at a given station were taken and actually used. This map shows the top (green) and bottom (red) decile of stations based on bike utilization. As you can see, virtually all of the stations with top 10% (more than around 24 turns) levels of bike utilization are in Manhattan, whereas stations in the bottom 10% (less than 1) are mostly in Brooklyn. Based on this sample, we recommend CitiBike re-locate some of the least used stations from Brooklyn to Manhattan. This will balance the wear and tear that bikes are receiving and reduce the number of stations on Manhattan that have particularly high bike deficits. Using this tactic in addition to the incentive model we discussed prior could significantly smooth demand, inventory and usage. 
+For this visualization, we created a rough measure of each station's bike utilization using the data set and our own assumptions. First, we assume the average number of bikes at each station given the total number of bikes and stations in the data. Then, we calculated the number of 'turns' of this average based on the number of departures by station. We used departure counts rather than including arrivals because we wanted a measure of how many times bikes at a given station were taken and actually used. This map shows the top (green) and bottom (red) decile of stations based on bike utilization. As you can see, virtually all of the stations with top 10% (thousands of turns) levels of bike utilization are in Manhattan, whereas stations in the bottom 10% (less than 1) are mostly in Brooklyn. Based on this sample, we recommend CitiBike re-locate some of the least used stations from Brooklyn to Manhattan. This will balance the wear and tear that bikes are receiving and reduce the number of stations on Manhattan that have particularly high bike deficits. Using this tactic in addition to the incentive model we discussed prior could significantly smooth demand, inventory and usage. 
 
 ## Which Stations are in the Top and Bottom Deciles of Deficit/Surplus?
 
